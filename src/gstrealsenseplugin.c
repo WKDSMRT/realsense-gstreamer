@@ -62,6 +62,8 @@
 
 #include <gst/gst.h>
 
+#include <librealsense2/rs.hpp>
+
 #include "gstrealsenseplugin.h"
 
 GST_DEBUG_CATEGORY_STATIC (gst_plugin_template_debug);

@@ -1,5 +1,4 @@
-#TODO update to at least 3.10
-cmake_minimum_required(VERSION 3.0.1)
+cmake_minimum_required(VERSION 3.10)
 
 project("realsense-gstreamer")
 
@@ -38,3 +37,4 @@ link_directories(
     ${GSTREAMER_LIBRARY_DIRS}
 )
 add_subdirectory("src")
+
