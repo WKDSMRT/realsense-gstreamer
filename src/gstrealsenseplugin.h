@@ -7,7 +7,7 @@
 #include <gst/gst.h>
 #include <gst/base/gstpushsrc.h>
 
-#include <librealsense2/rs.hpp>
+// #include <librealsense2/rs.hpp>
 
 G_BEGIN_DECLS
 
@@ -21,20 +21,20 @@ G_BEGIN_DECLS
 #define PACKAGE_VERSION 0
 #define GST_LICENSE "none" 
 #define GST_PACKAGE_NAME "gstrealsensesrc"
-#define GST_PACKAGE_ORIGIN "WKD.SMRT"
-#define PLUGIN_DESCRIPTION "RealSense source plugin"
+#define GST_PACKAGE_ORIGIN "WKDSMRT"
+#define PLUGIN_DESCRIPTION "RealSense-source-plugin"
 
 typedef struct _GstRealsenseSrc GstRealsenseSrc;
 typedef struct _GstRealsenseSrcClass GstRealsenseSrcClass;
 
-using rs_pipe_ptr = std::unique_ptr<rs2::pipeline>;
+// using rs_pipe_ptr = std::unique_ptr<rs2::pipeline>;
 
 struct _GstRealsenseSrc
 {
   GstPushSrc base_realsensesrc;
 
   /* camera handle */
-  rs_pipe_ptr rs_pipeline = nullptr;
+  // rs_pipe_ptr rs_pipeline = nullptr;
 
   gchar error_string[256];
   /* properties - may or may not need all of these*/

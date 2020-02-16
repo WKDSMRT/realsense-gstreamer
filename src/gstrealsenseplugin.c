@@ -165,7 +165,8 @@ gst_realsensesrc_class_init (GstRealsenseSrcClass * klass)
       0, 
       G_MAXINT,
       DEFAULT_PROP_TIMEOUT, 
-      static_cast<GParamFlags>(G_PARAM_STATIC_STRINGS | G_PARAM_READWRITE)
+      (GParamFlags)(G_PARAM_STATIC_STRINGS | G_PARAM_READWRITE)
+      //static_cast<GParamFlags>(G_PARAM_STATIC_STRINGS | G_PARAM_READWRITE)
     )
   );
 
@@ -291,7 +292,7 @@ gst_realsensesrc_start (GstBaseSrc * bsrc)
   GST_DEBUG_OBJECT (src, "start");
 
   /* Open interface to camera + sensors */
-  src->rs_pipeline = std::make_unique<rs2::pipeline>();
+  // src->rs_pipeline = std::make_unique<rs2::pipeline>();
 
   GST_DEBUG_OBJECT (src, "Camera %d has been opened.\n", src->cam_index);
 
@@ -336,7 +337,7 @@ gst_realsensesrc_start (GstBaseSrc * bsrc)
   src->gst_stride = GST_VIDEO_INFO_COMP_STRIDE (&vinfo, 0);
   src->rs_stride = stride;
 
-  src->rs_pipeline->start();
+  // src->rs_pipeline->start();
   /* TODO: check timestamps on buffers vs start time */
   src->acq_start_time =
       gst_clock_get_time (gst_element_get_clock (GST_ELEMENT (src)));
@@ -349,7 +350,7 @@ gst_realsensesrc_stop (GstBaseSrc * bsrc)
 {
   GstRealsenseSrc *src = GST_REALSENSE_SRC (bsrc);
 
-  src->rs_pipeline->stop();
+  // src->rs_pipeline->stop();
 
   gst_realsensesrc_reset (src);
 
@@ -428,8 +429,8 @@ gst_realsensesrc_unlock_stop (GstBaseSrc * bsrc)
 }
 
 static GstBuffer *
-gst_realsensesrc_create_buffer_from_frameset (const GstRealsenseSrc * src,
-const rs2::frameset& data)
+gst_realsensesrc_create_buffer_from_frameset (const GstRealsenseSrc * src)
+// , const rs2::frameset& data)
 {
   GstMapInfo minfo;
   GstBuffer *buf;
@@ -451,7 +452,7 @@ gst_realsensesrc_create (GstPushSrc * psrc, GstBuffer ** buf)
   GST_LOG_OBJECT (src, "create");
 
   /* wait for next frame to be available */
-  auto data = src->rs_pipeline->wait_for_frames();
+  // auto data = src->rs_pipeline->wait_for_frames();
 
   // if (!data) {
   //   GST_ELEMENT_ERROR (src, RESOURCE, FAILED,
@@ -467,7 +468,7 @@ gst_realsensesrc_create (GstPushSrc * psrc, GstBuffer ** buf)
   /* check for dropped frames and disrupted signal */
   
   /* create GstBuffer then release buffer back to acquisition */
-  *buf = gst_realsensesrc_create_buffer_from_frameset (src, data);
+  *buf = gst_realsensesrc_create_buffer_from_frameset (src);//, data);
 
   
   GST_BUFFER_TIMESTAMP (*buf) =
@@ -524,7 +525,7 @@ plugin_init (GstPlugin * plugin)
 GST_PLUGIN_DEFINE (
     GST_VERSION_MAJOR,
     GST_VERSION_MINOR,
-    plugin,
+    gstrealsensesrc,
     "RealSense camera source",
     plugin_init,
     PACKAGE_VERSION,
