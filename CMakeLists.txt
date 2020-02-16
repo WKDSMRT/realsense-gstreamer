@@ -16,7 +16,7 @@ link_directories(
 
 # GSTREAMER
 #TODO Find which version we actually need
-set(GSTREAMER_MINIMUM_VERSION 1.0.5)
+set(GSTREAMER_MINIMUM_VERSION 1.14.5)
 
 pkg_check_modules(GST1_TEST gstreamer-1.0)
 if ( GST1_TEST_FOUND AND NOT ${GST1_TEST_VERSION} VERSION_LESS ${GSTREAMER_MINIMUM_VERSION} )

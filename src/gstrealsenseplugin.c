@@ -230,7 +230,7 @@ gst_realsensesrc_set_property (GObject * object, guint property_id,
 }
 
 static void
-gst_plugin_template_get_property (GObject * object, guint property_id,
+gst_realsensesrc_get_property (GObject * object, guint property_id,
     GValue * value, GParamSpec * pspec)
 {
   g_return_if_fail (GST_IS_REALSENSE_SRC (object));

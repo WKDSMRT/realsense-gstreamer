@@ -11,7 +11,7 @@
 
 G_BEGIN_DECLS
 
-#define GST_TYPE_REALSENSE_SRC (gst_plugin_realsense_get_type())
+#define GST_TYPE_REALSENSE_SRC (gst_realsensesrc_get_type())
 #define GST_REALSENSE_SRC(obj) (G_TYPE_CHECK_INSTANCE_CAST((obj),GST_TYPE_REALSENSE_SRC, GstRealsenseSrc))
 #define GST_REALSENSE_SRC_CLASS(klass) (G_TYPE_CHECK_CLASS_CAST((klass),GST_TYPE_REALSENSE_SRC,GstRealsenseTemplateClass))
 #define GST_IS_REALSENSE_SRC(obj) (G_TYPE_CHECK_INSTANCE_TYPE((obj),GST_TYPE_REALSENSE_SRC))
@@ -36,7 +36,7 @@ struct _GstRealsenseSrc
   /* camera handle */
   rs_pipe_ptr rs_pipeline = nullptr;
 
-  gchar* error_string = "Not implemented";
+  gchar error_string[256];
   /* properties - may or may not need all of these*/
   guint num_capture_buffers;
   guint cam_index;
@@ -59,7 +59,7 @@ struct _GstRealsenseSrcClass
   GstPushSrcClass base_realsense_class;
 };
 
-GType gst_plugin_realsense_get_type (void);
+GType gst_realsensesrc_get_type (void);
 
 G_END_DECLS
 
