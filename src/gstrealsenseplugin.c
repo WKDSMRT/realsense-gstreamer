@@ -514,7 +514,7 @@ plugin_init (GstPlugin * plugin)
  * compile this code. GST_PLUGIN_DEFINE needs PACKAGE to be defined.
  */
 #ifndef PACKAGE
-#define PACKAGE "gst-realsense-plugin"
+#define PACKAGE "gstrealsensesrc"
 #endif
 
 /* gstreamer looks for this structure to register plugins

@@ -20,9 +20,9 @@ G_BEGIN_DECLS
 // TODO set these in CMakeLists.txt
 #define PACKAGE_VERSION 0
 #define GST_LICENSE "none" 
-#define GST_PACKAGE_NAME "realsense-plugin"
+#define GST_PACKAGE_NAME "gstrealsensesrc"
 #define GST_PACKAGE_ORIGIN "WKD.SMRT"
-constexpr auto PLUGIN_DESCRIPTION = "RealSense source plugin";
+#define PLUGIN_DESCRIPTION "RealSense source plugin"
 
 typedef struct _GstRealsenseSrc GstRealsenseSrc;
 typedef struct _GstRealsenseSrcClass GstRealsenseSrcClass;
