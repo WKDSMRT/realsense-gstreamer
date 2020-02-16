@@ -2,7 +2,7 @@
  * GStreamer
  * Copyright (C) 2005 Thomas Vander Stichele <thomas@apestaart.org>
  * Copyright (C) 2005 Ronald S. Bultje <rbultje@ronald.bitfreak.net>
- * Copyright (C) YEAR AUTHOR_NAME AUTHOR_EMAIL
+ * Copyright (C) 2020 tim <<user@hostname.org>>
  * 
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -44,14 +44,14 @@
  */
 
 /**
- * SECTION:element-plugin
+ * SECTION:element-realsensesrc
  *
- * FIXME:Describe plugin here.
+ * FIXME:Describe realsensesrc here.
  *
  * <refsect2>
  * <title>Example launch line</title>
  * |[
- * gst-launch -v -m fakesrc ! plugin ! fakesink silent=TRUE
+ * gst-launch -v -m fakesrc ! realsensesrc ! fakesink silent=TRUE
  * ]|
  * </refsect2>
  */
@@ -64,8 +64,8 @@
 
 #include "gstrealsenseplugin.h"
 
-GST_DEBUG_CATEGORY_STATIC (gst_plugin_template_debug);
-#define GST_CAT_DEFAULT gst_plugin_template_debug
+GST_DEBUG_CATEGORY_STATIC (gst_realsense_src_debug);
+#define GST_CAT_DEFAULT gst_realsense_src_debug
 
 /* Filter signals and args */
 enum
@@ -96,22 +96,22 @@ static GstStaticPadTemplate src_factory = GST_STATIC_PAD_TEMPLATE ("src",
     GST_STATIC_CAPS ("ANY")
     );
 
-#define gst_plugin_template_parent_class parent_class
-G_DEFINE_TYPE (GstPluginTemplate, gst_plugin_template, GST_TYPE_ELEMENT);
+#define gst_realsense_src_parent_class parent_class
+G_DEFINE_TYPE (GstRealsenseSrc, gst_realsense_src, GST_TYPE_ELEMENT);
 
-static void gst_plugin_template_set_property (GObject * object, guint prop_id,
+static void gst_realsense_src_set_property (GObject * object, guint prop_id,
     const GValue * value, GParamSpec * pspec);
-static void gst_plugin_template_get_property (GObject * object, guint prop_id,
+static void gst_realsense_src_get_property (GObject * object, guint prop_id,
     GValue * value, GParamSpec * pspec);
 
-static gboolean gst_plugin_template_sink_event (GstPad * pad, GstObject * parent, GstEvent * event);
-static GstFlowReturn gst_plugin_template_chain (GstPad * pad, GstObject * parent, GstBuffer * buf);
+static gboolean gst_realsense_src_sink_event (GstPad * pad, GstObject * parent, GstEvent * event);
+static GstFlowReturn gst_realsense_src_chain (GstPad * pad, GstObject * parent, GstBuffer * buf);
 
 /* GObject vmethod implementations */
 
-/* initialize the plugin's class */
+/* initialize the realsensesrc's class */
 static void
-gst_plugin_template_class_init (GstPluginTemplateClass * klass)
+gst_realsense_src_class_init (GstRealsenseSrcClass * klass)
 {
   GObjectClass *gobject_class;
   GstElementClass *gstelement_class;
@@ -119,18 +119,18 @@ gst_plugin_template_class_init (GstPluginTemplateClass * klass)
   gobject_class = (GObjectClass *) klass;
   gstelement_class = (GstElementClass *) klass;
 
-  gobject_class->set_property = gst_plugin_template_set_property;
-  gobject_class->get_property = gst_plugin_template_get_property;
+  gobject_class->set_property = gst_realsense_src_set_property;
+  gobject_class->get_property = gst_realsense_src_get_property;
 
   g_object_class_install_property (gobject_class, PROP_SILENT,
       g_param_spec_boolean ("silent", "Silent", "Produce verbose output ?",
           FALSE, G_PARAM_READWRITE));
 
   gst_element_class_set_details_simple(gstelement_class,
-    "Plugin",
+    "RealsenseSrc",
     "FIXME:Generic",
     "FIXME:Generic Template Element",
-    "AUTHOR_NAME AUTHOR_EMAIL");
+    "tim <<user@hostname.org>>");
 
   gst_element_class_add_pad_template (gstelement_class,
       gst_static_pad_template_get (&src_factory));
@@ -144,13 +144,13 @@ gst_plugin_template_class_init (GstPluginTemplateClass * klass)
  * initialize instance structure
  */
 static void
-gst_plugin_template_init (GstPluginTemplate * filter)
+gst_realsense_src_init (GstRealsenseSrc * filter)
 {
   filter->sinkpad = gst_pad_new_from_static_template (&sink_factory, "sink");
   gst_pad_set_event_function (filter->sinkpad,
-                              GST_DEBUG_FUNCPTR(gst_plugin_template_sink_event));
+                              GST_DEBUG_FUNCPTR(gst_realsense_src_sink_event));
   gst_pad_set_chain_function (filter->sinkpad,
-                              GST_DEBUG_FUNCPTR(gst_plugin_template_chain));
+                              GST_DEBUG_FUNCPTR(gst_realsense_src_chain));
   GST_PAD_SET_PROXY_CAPS (filter->sinkpad);
   gst_element_add_pad (GST_ELEMENT (filter), filter->sinkpad);
 
@@ -162,10 +162,10 @@ gst_plugin_template_init (GstPluginTemplate * filter)
 }
 
 static void
-gst_plugin_template_set_property (GObject * object, guint prop_id,
+gst_realsense_src_set_property (GObject * object, guint prop_id,
     const GValue * value, GParamSpec * pspec)
 {
-  GstPluginTemplate *filter = GST_PLUGIN_TEMPLATE (object);
+  GstRealsenseSrc *filter = GST_REALSENSESRC (object);
 
   switch (prop_id) {
     case PROP_SILENT:
@@ -178,10 +178,10 @@ gst_plugin_template_set_property (GObject * object, guint prop_id,
 }
 
 static void
-gst_plugin_template_get_property (GObject * object, guint prop_id,
+gst_realsense_src_get_property (GObject * object, guint prop_id,
     GValue * value, GParamSpec * pspec)
 {
-  GstPluginTemplate *filter = GST_PLUGIN_TEMPLATE (object);
+  GstRealsenseSrc *filter = GST_REALSENSESRC (object);
 
   switch (prop_id) {
     case PROP_SILENT:
@@ -197,12 +197,12 @@ gst_plugin_template_get_property (GObject * object, guint prop_id,
 
 /* this function handles sink events */
 static gboolean
-gst_plugin_template_sink_event (GstPad * pad, GstObject * parent, GstEvent * event)
+gst_realsense_src_sink_event (GstPad * pad, GstObject * parent, GstEvent * event)
 {
-  GstPluginTemplate *filter;
+  GstRealsenseSrc *filter;
   gboolean ret;
 
-  filter = GST_PLUGIN_TEMPLATE (parent);
+  filter = GST_REALSENSESRC (parent);
 
   GST_LOG_OBJECT (filter, "Received %s event: %" GST_PTR_FORMAT,
       GST_EVENT_TYPE_NAME (event), event);
@@ -230,11 +230,11 @@ gst_plugin_template_sink_event (GstPad * pad, GstObject * parent, GstEvent * eve
  * this function does the actual processing
  */
 static GstFlowReturn
-gst_plugin_template_chain (GstPad * pad, GstObject * parent, GstBuffer * buf)
+gst_realsense_src_chain (GstPad * pad, GstObject * parent, GstBuffer * buf)
 {
-  GstPluginTemplate *filter;
+  GstRealsenseSrc *filter;
 
-  filter = GST_PLUGIN_TEMPLATE (parent);
+  filter = GST_REALSENSESRC (parent);
 
   if (filter->silent == FALSE)
     g_print ("I'm plugged, therefore I'm in.\n");
@@ -249,17 +249,17 @@ gst_plugin_template_chain (GstPad * pad, GstObject * parent, GstBuffer * buf)
  * register the element factories and other features
  */
 static gboolean
-plugin_init (GstPlugin * plugin)
+realsensesrc_init (GstPlugin * realsensesrc)
 {
   /* debug category for fltering log messages
    *
-   * exchange the string 'Template plugin' with your description
+   * exchange the string 'Template realsensesrc' with your description
    */
-  GST_DEBUG_CATEGORY_INIT (gst_plugin_template_debug, "plugin",
-      0, "Template plugin");
+  GST_DEBUG_CATEGORY_INIT (gst_realsense_src_debug, "realsensesrc",
+      0, "Template realsensesrc");
 
-  return gst_element_register (plugin, "plugin", GST_RANK_NONE,
-      GST_TYPE_PLUGIN_TEMPLATE);
+  return gst_element_register (realsensesrc, "realsensesrc", GST_RANK_NONE,
+      GST_TYPE_REALSENSESRC);
 }
 
 /* PACKAGE: this is usually set by autotools depending on some _INIT macro
@@ -268,19 +268,19 @@ plugin_init (GstPlugin * plugin)
  * compile this code. GST_PLUGIN_DEFINE needs PACKAGE to be defined.
  */
 #ifndef PACKAGE
-#define PACKAGE "myfirstplugin"
+#define PACKAGE "myfirstrealsensesrc"
 #endif
 
-/* gstreamer looks for this structure to register plugins
+/* gstreamer looks for this structure to register realsensesrcs
  *
- * exchange the string 'Template plugin' with your plugin description
+ * exchange the string 'Template realsensesrc' with your realsensesrc description
  */
 GST_PLUGIN_DEFINE (
     GST_VERSION_MAJOR,
     GST_VERSION_MINOR,
-    plugin,
-    "Template plugin",
-    plugin_init,
+    realsensesrc,
+    "Template realsensesrc",
+    realsensesrc_init,
     PACKAGE_VERSION,
     GST_LICENSE,
     GST_PACKAGE_NAME,

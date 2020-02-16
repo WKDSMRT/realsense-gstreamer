@@ -17,7 +17,7 @@ plugin_sources = [
   'gstrealsenseplugin.c'
   ]
 
-gstpluginexample = library('gstplugin',
+gstpluginexample = library('gstrealsensesrc',
   plugin_sources,
   c_args: plugin_c_args,
   dependencies : [gst_dep],
