@@ -9,8 +9,8 @@ cdata.set_quoted('GST_PACKAGE_NAME', 'GStreamer template Plug-ins')
 cdata.set_quoted('GST_PACKAGE_ORIGIN', 'https://gstreamer.freedesktop.org')
 configure_file(output : 'config.h', configuration : cdata)
 
-gstaudio_dep = dependency('gstreamer-audio-1.0',
-    fallback: ['gst-plugins-base', 'audio_dep'])
+gstvideo_dep = dependency('gstreamer-video-1.0',
+    fallback: ['gst-plugins-base', 'video_dep'])
 
 realsense_dep = dependency('realsense2')
 
@@ -22,7 +22,7 @@ plugin_sources = [
 gstpluginexample = library('gstrealsensesrc',
   plugin_sources,
   cpp_args: plugin_cpp_args,
-  dependencies : [gst_dep, realsense_dep],
+  dependencies : [gst_dep, gstvideo_dep, realsense_dep],
   install : true,
   install_dir : plugins_install_dir,
 )

@@ -47,6 +47,10 @@
 #define __GST_REALSENSESRC_H__
 
 #include <gst/gst.h>
+#include <gst/base/gstpushsrc.h>
+
+#include <gst/video/gstvideometa.h>
+#include <gst/video/gstvideopool.h>
 
 #include <librealsense2/rs.hpp>
 
@@ -71,9 +75,10 @@ using rs_pipe_ptr = std::unique_ptr<rs2::pipeline>;
 
 struct _GstRealsenseSrc
 {
-  GstElement element;
+  GstPushSrc element;
 
-  GstPad *sinkpad, *srcpad;
+  // GstPad *srcpad;
+  GstVideoInfo info; /* protected by the object or stream lock */
 
   gboolean silent;
 
