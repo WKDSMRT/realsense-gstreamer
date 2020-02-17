@@ -178,7 +178,7 @@ gst_realsense_src_init (GstRealsenseSrc * src)
   /* override default of BYTES to operate in time mode */
   gst_base_src_set_format (GST_BASE_SRC (src), GST_FORMAT_TIME);
 
-  src->rs2_pipeline = std::make_unique<rs2::pipeline>();
+  src->rs_pipeline = std::make_unique<rs2::pipeline>();
   // gst_video_test_src_set_pattern (src, DEFAULT_PATTERN);
 
   // src->timestamp_offset = DEFAULT_TIMESTAMP_OFFSET;
@@ -229,7 +229,7 @@ gst_realsense_src_get_property (GObject * object, guint prop_id,
   }
 }
 
-static GstFlowReturn
+/*static GstFlowReturn
 gst_realsense_src_fill (GstPushSrc * psrc, GstBuffer * buffer)
 {
   // GstVideoTestSrc *src;
@@ -240,10 +240,10 @@ gst_realsense_src_fill (GstPushSrc * psrc, GstBuffer * buffer)
 
   GstRealsenseSrc *src = GST_REALSENSESRC (psrc);
 
-  auto frame = src->rs_pipeline->wait_for_frame();
+  auto frame = src->rs_pipeline->wait_for_frames();
 
   return GST_FLOW_OK;
-}
+}*/
 
 static GstBuffer *
 gst_realsense_src_create_buffer_from_frameset (GstRealsenseSrc * src, rs2::frameset& frame)
@@ -251,7 +251,7 @@ gst_realsense_src_create_buffer_from_frameset (GstRealsenseSrc * src, rs2::frame
   GstMapInfo minfo;
   GstBuffer *buf;
 
-  auto vf = frame.as<rs2::video_frame>()
+  auto vf = frame.as<rs2::video_frame>();
 
   /* TODO: use allocator or use from pool */
   buf = gst_buffer_new_and_alloc (vf.get_height() * src->gst_stride);
@@ -270,7 +270,7 @@ gst_realsense_src_create_buffer_from_frameset (GstRealsenseSrc * src, rs2::frame
   // stbi_write_png(png_file.str().c_str(), vf.get_width(), vf.get_height(),
   //     vf.get_bytes_per_pixel(), vf.get_data(), vf.get_stride_in_bytes());
 
-  auto rs_stride = vf.get_stride_in_bytes()
+  auto rs_stride = vf.get_stride_in_bytes();
   /* TODO: use orc_memcpy */
   if (src->gst_stride == rs_stride) 
   {
@@ -302,14 +302,14 @@ gst_realsense_src_create (GstPushSrc * psrc, GstBuffer ** buf)
   // GST_LOG_OBJECT (src, "create");
 
   /* wait for next frame to be available */
-  auto frame = src->rs_pipeline->wait_for_frame();
+  auto frame = src->rs_pipeline->wait_for_frames();
 
   // clock = gst_element_get_clock (GST_ELEMENT (src));
   // clock_time = gst_clock_get_time (clock);
   // gst_object_unref (clock);
 
   /* create GstBuffer then release circ buffer back to acquisition */
-  *buf = gst_realsense_src_create_buffer_from_frameset(src, frames);
+  *buf = gst_realsense_src_create_buffer_from_frameset(src, frame);
 
   /* TODO: understand why timestamps for circ_handle are sometimes 0 */
   //GST_BUFFER_TIMESTAMP (*buf) =
@@ -347,8 +347,8 @@ gst_realsense_src_start (GstBaseSrc * basesrc)
   src->rs_pipeline->start();
   // TODO need to set up format here
 
-  src->height = vinfo.height;
-  src->gst_stride = GST_VIDEO_INFO_COMP_STRIDE (&vinfo, 0);
+  src->height = src->info.height;
+  src->gst_stride = GST_VIDEO_INFO_COMP_STRIDE (&src->info, 0);
 
   
 
