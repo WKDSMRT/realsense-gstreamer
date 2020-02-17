@@ -84,12 +84,6 @@ enum
  *
  * describe the real formats here.
  */
-static GstStaticPadTemplate sink_factory = GST_STATIC_PAD_TEMPLATE ("sink",
-    GST_PAD_SINK,
-    GST_PAD_ALWAYS,
-    GST_STATIC_CAPS ("ANY")
-    );
-
 static GstStaticPadTemplate src_factory = GST_STATIC_PAD_TEMPLATE ("src",
     GST_PAD_SRC,
     GST_PAD_ALWAYS,
@@ -103,9 +97,6 @@ static void gst_realsense_src_set_property (GObject * object, guint prop_id,
     const GValue * value, GParamSpec * pspec);
 static void gst_realsense_src_get_property (GObject * object, guint prop_id,
     GValue * value, GParamSpec * pspec);
-
-static gboolean gst_realsense_src_sink_event (GstPad * pad, GstObject * parent, GstEvent * event);
-static GstFlowReturn gst_realsense_src_chain (GstPad * pad, GstObject * parent, GstBuffer * buf);
 
 /* GObject vmethod implementations */
 
@@ -134,8 +125,6 @@ gst_realsense_src_class_init (GstRealsenseSrcClass * klass)
 
   gst_element_class_add_pad_template (gstelement_class,
       gst_static_pad_template_get (&src_factory));
-  gst_element_class_add_pad_template (gstelement_class,
-      gst_static_pad_template_get (&sink_factory));
 }
 
 /* initialize the new element
@@ -146,14 +135,6 @@ gst_realsense_src_class_init (GstRealsenseSrcClass * klass)
 static void
 gst_realsense_src_init (GstRealsenseSrc * filter)
 {
-  filter->sinkpad = gst_pad_new_from_static_template (&sink_factory, "sink");
-  gst_pad_set_event_function (filter->sinkpad,
-                              GST_DEBUG_FUNCPTR(gst_realsense_src_sink_event));
-  gst_pad_set_chain_function (filter->sinkpad,
-                              GST_DEBUG_FUNCPTR(gst_realsense_src_chain));
-  GST_PAD_SET_PROXY_CAPS (filter->sinkpad);
-  gst_element_add_pad (GST_ELEMENT (filter), filter->sinkpad);
-
   filter->srcpad = gst_pad_new_from_static_template (&src_factory, "src");
   GST_PAD_SET_PROXY_CAPS (filter->srcpad);
   gst_element_add_pad (GST_ELEMENT (filter), filter->srcpad);
@@ -192,57 +173,6 @@ gst_realsense_src_get_property (GObject * object, guint prop_id,
       break;
   }
 }
-
-/* GstElement vmethod implementations */
-
-/* this function handles sink events */
-static gboolean
-gst_realsense_src_sink_event (GstPad * pad, GstObject * parent, GstEvent * event)
-{
-  GstRealsenseSrc *filter;
-  gboolean ret;
-
-  filter = GST_REALSENSESRC (parent);
-
-  GST_LOG_OBJECT (filter, "Received %s event: %" GST_PTR_FORMAT,
-      GST_EVENT_TYPE_NAME (event), event);
-
-  switch (GST_EVENT_TYPE (event)) {
-    case GST_EVENT_CAPS:
-    {
-      GstCaps * caps;
-
-      gst_event_parse_caps (event, &caps);
-      /* do something with the caps */
-
-      /* and forward */
-      ret = gst_pad_event_default (pad, parent, event);
-      break;
-    }
-    default:
-      ret = gst_pad_event_default (pad, parent, event);
-      break;
-  }
-  return ret;
-}
-
-/* chain function
- * this function does the actual processing
- */
-static GstFlowReturn
-gst_realsense_src_chain (GstPad * pad, GstObject * parent, GstBuffer * buf)
-{
-  GstRealsenseSrc *filter;
-
-  filter = GST_REALSENSESRC (parent);
-
-  if (filter->silent == FALSE)
-    g_print ("I'm plugged, therefore I'm in.\n");
-
-  /* just push out the incoming buffer without touching it */
-  return gst_pad_push (filter->srcpad, buf);
-}
-
 
 /* entry point to initialize the plug-in
  * initialize the plug-in itself

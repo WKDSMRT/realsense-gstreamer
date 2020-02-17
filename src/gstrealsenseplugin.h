@@ -67,6 +67,8 @@ G_BEGIN_DECLS
 typedef struct _GstRealsenseSrc      GstRealsenseSrc;
 typedef struct _GstRealsenseSrcClass GstRealsenseSrcClass;
 
+using rs_pipe_ptr = std::unique_ptr<rs2::pipeline>;
+
 struct _GstRealsenseSrc
 {
   GstElement element;
@@ -74,6 +76,9 @@ struct _GstRealsenseSrc
   GstPad *sinkpad, *srcpad;
 
   gboolean silent;
+
+  // Realsense vars
+  rs_pipe_ptr rs_pipeline = nullptr;
 };
 
 struct _GstRealsenseSrcClass 
