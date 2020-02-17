@@ -100,7 +100,7 @@ enum
 static GstStaticPadTemplate src_factory = GST_STATIC_PAD_TEMPLATE ("src",
     GST_PAD_SRC,
     GST_PAD_ALWAYS,
-    GST_STATIC_CAPS (RSS_VIDEO_CAPS)
+    GST_STATIC_CAPS ("ANY")
     );
 
 #define gst_realsense_src_parent_class parent_class
@@ -111,7 +111,7 @@ static void gst_realsense_src_set_property (GObject * object, guint prop_id,
 static void gst_realsense_src_get_property (GObject * object, guint prop_id,
     GValue * value, GParamSpec * pspec);
 
-// static GstFlowReturn gst_realsense_src_fill (GstPushSrc * psrc, GstBuffer * buffer);
+static GstFlowReturn gst_realsense_src_fill (GstPushSrc * psrc, GstBuffer * buffer);
 static GstFlowReturn gst_realsense_src_create (GstPushSrc * src, GstBuffer ** buf);
 
 static gboolean gst_realsense_src_start (GstBaseSrc * basesrc);
@@ -161,7 +161,7 @@ gst_realsense_src_class_init (GstRealsenseSrcClass * klass)
   // gstbasesrc_class->decide_allocation = gst_video_test_src_decide_allocation;
 
   gstpushsrc_class->create = gst_realsense_src_create;
-  // gstpushsrc_class->fill = gst_realsense_src_fill;
+  gstpushsrc_class->fill = gst_realsense_src_fill;
 }
 
 /* initialize the new element
@@ -229,7 +229,7 @@ gst_realsense_src_get_property (GObject * object, guint prop_id,
   }
 }
 
-/*static GstFlowReturn
+static GstFlowReturn
 gst_realsense_src_fill (GstPushSrc * psrc, GstBuffer * buffer)
 {
   // GstVideoTestSrc *src;
@@ -243,7 +243,7 @@ gst_realsense_src_fill (GstPushSrc * psrc, GstBuffer * buffer)
   auto frame = src->rs_pipeline->wait_for_frames();
 
   return GST_FLOW_OK;
-}*/
+}
 
 static GstBuffer *
 gst_realsense_src_create_buffer_from_frameset (GstRealsenseSrc * src, rs2::frameset& frame)
