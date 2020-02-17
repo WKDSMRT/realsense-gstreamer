@@ -82,6 +82,10 @@ struct _GstRealsenseSrc
 
   gboolean silent;
 
+  // GstCaps *caps;
+  gint height;
+  gint gst_stride;
+  
   // Realsense vars
   rs_pipe_ptr rs_pipeline = nullptr;
 };
