@@ -48,6 +48,8 @@
 
 #include <gst/gst.h>
 
+#include <librealsense2/rs.hpp>
+
 G_BEGIN_DECLS
 
 /* #defines don't like whitespacey bits */

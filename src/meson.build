@@ -1,4 +1,4 @@
-plugin_c_args = ['-DHAVE_CONFIG_H']
+plugin_cpp_args = ['-DHAVE_CONFIG_H']
 
 cdata = configuration_data()
 cdata.set_quoted('PACKAGE_VERSION', gst_version)
@@ -12,15 +12,17 @@ configure_file(output : 'config.h', configuration : cdata)
 gstaudio_dep = dependency('gstreamer-audio-1.0',
     fallback: ['gst-plugins-base', 'audio_dep'])
 
+realsense_dep = dependency('realsense2')
+
 # Plugin 1
 plugin_sources = [
-  'gstrealsenseplugin.c'
+  'gstrealsenseplugin.cpp'
   ]
 
 gstpluginexample = library('gstrealsensesrc',
   plugin_sources,
-  c_args: plugin_c_args,
-  dependencies : [gst_dep],
+  cpp_args: plugin_cpp_args,
+  dependencies : [gst_dep, realsense_dep],
   install : true,
   install_dir : plugins_install_dir,
 )
