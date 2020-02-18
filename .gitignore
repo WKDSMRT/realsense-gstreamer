@@ -32,4 +32,11 @@
 *.app
 *.so
 
-build/
+# Build
+build
+mbuild
+cmake*/
+
+# IDE/editor files
+.idea
+.vscode

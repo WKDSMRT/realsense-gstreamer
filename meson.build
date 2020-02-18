@@ -1,4 +1,4 @@
-project('gst-template', 'cpp', version : '1.17.0.1', license : 'LGPL')
+project('realsensesrc', 'cpp', version : '0.0.1', license : 'LGPL')
 
 plugins_install_dir = join_paths(get_option('libdir'), 'gstreamer-1.0')
 
