@@ -340,12 +340,13 @@ gst_realsense_src_start (GstBaseSrc * basesrc)
       GST_LOG_OBJECT(src, "RealSense pipeline started");
 
       // TODO need to set up format here
-      auto frame = src->rs_pipeline->wait_for_frames();
-      auto vf = frame.as<rs2::video_frame>();
-
-      auto height = vf.get_height();
-      auto width = vf.get_width();
-      auto rs_format = vf.get_profile().format();
+      auto frame_set = src->rs_pipeline->wait_for_frames();
+      // auto vf = frame.as<rs2::video_frame>();
+      auto cframe = frame_set.get_color_frame();
+      auto height = cframe.get_height();
+      // auto height = vf.get_height();
+      auto width = cframe.get_width();
+      auto rs_format = cframe.get_profile().format();
       // rs2_frame_metadata_value
       // auto raw_rs_size = vf.get_frame_metadata(RS2_FRAME_METADATA_RAW_FRAME_SIZE);
 
@@ -353,6 +354,7 @@ gst_realsense_src_start (GstBaseSrc * basesrc)
       switch(rs_format){
         case RS2_FORMAT_RGB8:
           gst_video_info_set_format(&vinfo, GST_VIDEO_FORMAT_RGB, width, height);
+          break;
         case RS2_FORMAT_BGR8:
         case RS2_FORMAT_RGBA8:
         case RS2_FORMAT_BGRA8:
