@@ -1,0 +1,3 @@
+#!/bin/bash
+
+sudo cp mbuild/src/libgstrealsensesrc.so /usr/local/lib/gstreamer-1.0/
