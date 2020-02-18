@@ -82,7 +82,7 @@ struct _GstRealsenseSrc
 
   gboolean silent;
 
-  // GstCaps *caps;
+  GstCaps *caps;
   gint height;
   gint gst_stride;
   

@@ -68,17 +68,10 @@
 GST_DEBUG_CATEGORY_STATIC (gst_realsense_src_debug);
 #define GST_CAT_DEFAULT gst_realsense_src_debug
 
-/* Filter signals and args */
-enum
-{
-  /* FILL ME */
-  LAST_SIGNAL
-};
-
 enum
 {
   PROP_0,
-  PROP_SILENT
+  // PROP_SILENT
 };
 
 /* the capabilities of the inputs and outputs.
@@ -112,7 +105,6 @@ static void gst_realsense_src_set_property (GObject * object, guint prop_id,
 static void gst_realsense_src_get_property (GObject * object, guint prop_id,
     GValue * value, GParamSpec * pspec);
 
-static GstFlowReturn gst_realsense_src_fill (GstPushSrc * psrc, GstBuffer * buffer);
 static GstFlowReturn gst_realsense_src_create (GstPushSrc * src, GstBuffer ** buf);
 
 static gboolean gst_realsense_src_start (GstBaseSrc * basesrc);
@@ -137,10 +129,6 @@ gst_realsense_src_class_init (GstRealsenseSrcClass * klass)
   gobject_class->set_property = gst_realsense_src_set_property;
   gobject_class->get_property = gst_realsense_src_get_property;
 
-  g_object_class_install_property (gobject_class, PROP_SILENT,
-      g_param_spec_boolean ("silent", "Silent", "Produce verbose output ?",
-          FALSE, G_PARAM_READWRITE));
-
   gst_element_class_set_details_simple(gstelement_class,
     "RealsenseSrc",
     "FIXME:Generic",
@@ -162,7 +150,6 @@ gst_realsense_src_class_init (GstRealsenseSrcClass * klass)
   // gstbasesrc_class->decide_allocation = gst_video_test_src_decide_allocation;
 
   gstpushsrc_class->create = gst_realsense_src_create;
-  gstpushsrc_class->fill = gst_realsense_src_fill;
 }
 
 /* initialize the new element
@@ -198,15 +185,12 @@ gst_realsense_src_init (GstRealsenseSrc * src)
 }
 
 static void
-gst_realsense_src_set_property (GObject * object, guint prop_id,
-    const GValue * value, GParamSpec * pspec)
+gst_realsense_src_set_property (GObject * object, guint prop_id, const GValue * value, GParamSpec * pspec)
 {
-  GstRealsenseSrc *filter = GST_REALSENSESRC (object);
+  // GstRealsenseSrc *src = GST_REALSENSESRC (object);
 
   switch (prop_id) {
-    case PROP_SILENT:
-      filter->silent = g_value_get_boolean (value);
-      break;
+    // TODO properties
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
       break;
@@ -214,35 +198,16 @@ gst_realsense_src_set_property (GObject * object, guint prop_id,
 }
 
 static void
-gst_realsense_src_get_property (GObject * object, guint prop_id,
-    GValue * value, GParamSpec * pspec)
+gst_realsense_src_get_property (GObject * object, guint prop_id, GValue * value, GParamSpec * pspec)
 {
-  GstRealsenseSrc *filter = GST_REALSENSESRC (object);
+  // GstRealsenseSrc *src = GST_REALSENSESRC (object);
 
   switch (prop_id) {
-    case PROP_SILENT:
-      g_value_set_boolean (value, filter->silent);
-      break;
+    // TODO properties
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
       break;
   }
-}
-
-static GstFlowReturn
-gst_realsense_src_fill (GstPushSrc * psrc, GstBuffer * buffer)
-{
-  // GstVideoTestSrc *src;
-  // GstClockTime next_time;
-  // GstVideoFrame frame;
-  // gconstpointer pal;
-  // gsize palsize;
-
-  GstRealsenseSrc *src = GST_REALSENSESRC (psrc);
-
-  auto frame = src->rs_pipeline->wait_for_frames();
-
-  return GST_FLOW_OK;
 }
 
 static GstBuffer *
@@ -266,9 +231,6 @@ gst_realsense_src_create_buffer_from_frameset (GstRealsenseSrc * src, rs2::frame
   // GST_LOG_OBJECT (src, "Buffer timestamp %02d:%02d:%02d.%06d",
   //     circ_handle->HiResTimeStamp.hour, circ_handle->HiResTimeStamp.min,
   //     circ_handle->HiResTimeStamp.sec, circ_handle->HiResTimeStamp.usec);
-
-  // stbi_write_png(png_file.str().c_str(), vf.get_width(), vf.get_height(),
-  //     vf.get_bytes_per_pixel(), vf.get_data(), vf.get_stride_in_bytes());
 
   auto rs_stride = vf.get_stride_in_bytes();
   /* TODO: use orc_memcpy */
@@ -299,19 +261,31 @@ gst_realsense_src_create (GstPushSrc * psrc, GstBuffer ** buf)
   // GstClock *clock;
   // GstClockTime clock_time;
 
-  // GST_LOG_OBJECT (src, "create");
+  GST_LOG_OBJECT (src, "create");
 
   /* wait for next frame to be available */
-  auto frame = src->rs_pipeline->wait_for_frames();
+  try 
+  {
+    auto frame = src->rs_pipeline->wait_for_frames();
 
-  // clock = gst_element_get_clock (GST_ELEMENT (src));
-  // clock_time = gst_clock_get_time (clock);
-  // gst_object_unref (clock);
+    // clock = gst_element_get_clock (GST_ELEMENT (src));
+    // clock_time = gst_clock_get_time (clock);
+    // gst_object_unref (clock);
 
-  /* create GstBuffer then release circ buffer back to acquisition */
-  *buf = gst_realsense_src_create_buffer_from_frameset(src, frame);
+    /* create GstBuffer then release circ buffer back to acquisition */
+    *buf = gst_realsense_src_create_buffer_from_frameset(src, frame);
+  }
+  catch (rs2::error & e)
+  {
+    GST_ERROR_OBJECT (
+             src,
+             "Realsense error calling %s (%s)",
+             e.get_failed_function().c_str(),
+             e.get_failed_args().c_str());
+      return GST_FLOW_ERROR;
+  }
 
-  /* TODO: understand why timestamps for circ_handle are sometimes 0 */
+  /* TODO: set timestamps */
   //GST_BUFFER_TIMESTAMP (*buf) =
   //    GST_CLOCK_DIFF (gst_element_get_base_time (GST_ELEMENT (src)),
   //    src->acq_start_time + circ_handle.HiResTimeStamp.totalSec * GST_SECOND);
@@ -335,38 +309,80 @@ static gboolean
 gst_realsense_src_start (GstBaseSrc * basesrc)
 {
   auto *src = GST_REALSENSESRC (basesrc);
+  GstVideoInfo vinfo;
 
-  try {
+  // GST_OBJECT_LOCK (src);
+
+  try 
+  {
+      GST_LOG_OBJECT(src, "Creating RealSense pipeline");
       src->rs_pipeline = std::make_unique<rs2::pipeline>();
+      if(src->rs_pipeline == nullptr)
+      {
+        GST_ELEMENT_ERROR (src, RESOURCE, FAILED, ("Failed to create RealSense pipeline."), (NULL));
+        // gst_element_post_message (src,
+        //                   GstMessage * message)
+        // GST_ERROR_OBJECT(src, "Failed to create RealSense pipeline");
+        return FALSE;
+      }
+      // auto profile = src->rs_pipeline->get_active_profile();
+      // auto streams = profile.get_streams();     
+      // auto s0 = streams[0].get();
+      
+      // src->running_time = 0;
+      // src->n_frames = 0;
+      // src->accum_frames = 0;
+      // src->accum_rtime = 0;
+
+      gst_video_info_init(&src->info);
+
+      src->rs_pipeline->start();
+      GST_LOG_OBJECT(src, "RealSense pipeline started");
+
+      // TODO need to set up format here
+      auto frame = src->rs_pipeline->wait_for_frames();
+      auto vf = frame.as<rs2::video_frame>();
+
+      auto height = vf.get_height();
+      auto width = vf.get_width();
+      auto rs_format = vf.get_profile().format();
+      // rs2_frame_metadata_value
+      // auto raw_rs_size = vf.get_frame_metadata(RS2_FRAME_METADATA_RAW_FRAME_SIZE);
+
+      gst_video_info_init (&vinfo);
+      switch(rs_format){
+        case RS2_FORMAT_RGB8:
+          gst_video_info_set_format(&vinfo, GST_VIDEO_FORMAT_RGB, width, height);
+        case RS2_FORMAT_BGR8:
+        case RS2_FORMAT_RGBA8:
+        case RS2_FORMAT_BGRA8:
+        case RS2_FORMAT_RAW16:
+        case RS2_FORMAT_Y16:
+        case RS2_FORMAT_YUYV:
+        default:
+          gst_video_info_set_format(&vinfo, GST_VIDEO_FORMAT_UNKNOWN, width, height);
+          GST_ELEMENT_ERROR (src, RESOURCE, FAILED, ("Unhandled RealSense format %d", rs_format), (NULL));
+          // GST_LOG_OBJECT(src, "Unhandled RealSense format %d", rs_format);
+      }
+      src->caps = gst_video_info_to_caps (&vinfo);
   }
   catch (rs2::error & e)
   {
-     GST_LOG_OBJECT (
+     GST_ERROR_OBJECT (
              src,
              "Realsense error calling %s (%s)",
              e.get_failed_function().c_str(),
              e.get_failed_args().c_str());
-      //std::cerr << "RealSense error calling " << e.get_failed_function() << "(" << e.get_failed_args() << "):\n    " << e.what() << std::endl;
+      GST_ELEMENT_ERROR (src, RESOURCE, FAILED, 
+        ("RealSense error calling %s (%s)", e.get_failed_function().c_str(), e.get_failed_args().c_str()),
+        (NULL));
       return FALSE;
   }
-
-  GST_OBJECT_LOCK (src);
-  // src->running_time = 0;
-  // src->n_frames = 0;
-  // src->accum_frames = 0;
-  // src->accum_rtime = 0;
-
-  gst_video_info_init (&src->info);
-
-  src->rs_pipeline->start();
-  // TODO need to set up format here
 
   src->height = src->info.height;
   src->gst_stride = GST_VIDEO_INFO_COMP_STRIDE (&src->info, 0);
 
-  
-
-  GST_OBJECT_UNLOCK (src);
+  // GST_OBJECT_UNLOCK (src);
 
   return TRUE;
 }
@@ -374,8 +390,11 @@ gst_realsense_src_start (GstBaseSrc * basesrc)
 static gboolean
 gst_realsense_src_stop (GstBaseSrc * basesrc)
 {
-  // GstRealsenseSrc *src = GST_REALSENSESRC (basesrc);
+  auto *src = GST_REALSENSESRC (basesrc);
   // guint i;
+
+  if(src->rs_pipeline != nullptr)
+    src->rs_pipeline->stop();
 
   // g_free (src->tmpline);
   // src->tmpline = NULL;
