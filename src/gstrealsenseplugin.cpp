@@ -100,11 +100,12 @@ enum
 static GstStaticPadTemplate src_factory = GST_STATIC_PAD_TEMPLATE ("src",
     GST_PAD_SRC,
     GST_PAD_ALWAYS,
-    GST_STATIC_CAPS ("ANY")
+    GST_STATIC_CAPS (GST_VIDEO_CAPS_MAKE
+        ("{ RGB, RGBx }"))
     );
 
 #define gst_realsense_src_parent_class parent_class
-G_DEFINE_TYPE (GstRealsenseSrc, gst_realsense_src, GST_TYPE_ELEMENT);
+G_DEFINE_TYPE (GstRealsenseSrc, gst_realsense_src, GST_TYPE_PUSH_SRC);
 
 static void gst_realsense_src_set_property (GObject * object, guint prop_id,
     const GValue * value, GParamSpec * pspec);
@@ -148,8 +149,8 @@ gst_realsense_src_class_init (GstRealsenseSrcClass * klass)
 
   // gst_element_class_add_pad_template (gstelement_class,
   //     gst_static_pad_template_get (&src_factory));
-  gst_element_class_add_static_pad_template (gstelement_class,
-      &src_factory);
+  gst_element_class_add_static_pad_template (gstelement_class, &src_factory);
+
   // gstbasesrc_class->set_caps = gst_video_test_src_setcaps;
   // gstbasesrc_class->fixate = gst_video_test_src_src_fixate;
   // gstbasesrc_class->is_seekable = gst_video_test_src_is_seekable;
@@ -172,13 +173,12 @@ gst_realsense_src_class_init (GstRealsenseSrcClass * klass)
 static void
 gst_realsense_src_init (GstRealsenseSrc * src)
 {
-    /* set source as live (no preroll) */
+  /* set source as live (no preroll) */
   gst_base_src_set_live (GST_BASE_SRC (src), TRUE);
 
   /* override default of BYTES to operate in time mode */
   gst_base_src_set_format (GST_BASE_SRC (src), GST_FORMAT_TIME);
 
-  src->rs_pipeline = std::make_unique<rs2::pipeline>();
   // gst_video_test_src_set_pattern (src, DEFAULT_PATTERN);
 
   // src->timestamp_offset = DEFAULT_TIMESTAMP_OFFSET;
@@ -336,6 +336,20 @@ gst_realsense_src_start (GstBaseSrc * basesrc)
 {
   auto *src = GST_REALSENSESRC (basesrc);
 
+  try {
+      src->rs_pipeline = std::make_unique<rs2::pipeline>();
+  }
+  catch (rs2::error & e)
+  {
+     GST_LOG_OBJECT (
+             src,
+             "Realsense error calling %s (%s)",
+             e.get_failed_function().c_str(),
+             e.get_failed_args().c_str());
+      //std::cerr << "RealSense error calling " << e.get_failed_function() << "(" << e.get_failed_args() << "):\n    " << e.what() << std::endl;
+      return FALSE;
+  }
+
   GST_OBJECT_LOCK (src);
   // src->running_time = 0;
   // src->n_frames = 0;
@@ -360,8 +374,8 @@ gst_realsense_src_start (GstBaseSrc * basesrc)
 static gboolean
 gst_realsense_src_stop (GstBaseSrc * basesrc)
 {
-  auto *src = GST_REALSENSESRC (basesrc);
-  guint i;
+  // GstRealsenseSrc *src = GST_REALSENSESRC (basesrc);
+  // guint i;
 
   // g_free (src->tmpline);
   // src->tmpline = NULL;
@@ -408,7 +422,7 @@ realsensesrc_init (GstPlugin * realsensesrc)
  * compile this code. GST_PLUGIN_DEFINE needs PACKAGE to be defined.
  */
 #ifndef PACKAGE
-#define PACKAGE "myfirstrealsensesrc"
+#define PACKAGE "realsensesrc"
 #endif
 
 /* gstreamer looks for this structure to register realsensesrcs

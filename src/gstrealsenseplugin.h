@@ -92,7 +92,7 @@ struct _GstRealsenseSrc
 
 struct _GstRealsenseSrcClass 
 {
-  GstElementClass parent_class;
+  GstPushSrcClass parent_class;
 };
 
 GType gst_realsense_src_get_type (void);
