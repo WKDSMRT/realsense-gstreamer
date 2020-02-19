@@ -77,7 +77,6 @@ struct _GstRealsenseSrc
 {
   GstPushSrc element;
 
-  // GstPad *srcpad;
   GstVideoInfo info; /* protected by the object or stream lock */
 
   gboolean silent;

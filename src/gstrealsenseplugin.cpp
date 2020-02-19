@@ -51,7 +51,7 @@
  * <refsect2>
  * <title>Example launch line</title>
  * |[
- * gst-launch -v -m fakesrc ! realsensesrc ! fakesink silent=TRUE
+ * gst-launch-1.0 -v -m realsensesrc ! videoconvert ! autovideosink
  * ]|
  * </refsect2>
  */
@@ -94,7 +94,7 @@ static GstStaticPadTemplate src_factory = GST_STATIC_PAD_TEMPLATE ("src",
     GST_PAD_SRC,
     GST_PAD_ALWAYS,
     GST_STATIC_CAPS (GST_VIDEO_CAPS_MAKE
-        ("{ RGB, RGBx }"))
+        ("{ RGB, RGBA, BGR, BGRA, GRAY16_LE, GRAY16_BE, YVYU }"))
     );
 
 #define gst_realsense_src_parent_class parent_class
@@ -168,23 +168,6 @@ gst_realsense_src_init (GstRealsenseSrc * src)
 
   /* override default of BYTES to operate in time mode */
   gst_base_src_set_format (GST_BASE_SRC (src), GST_FORMAT_TIME);
-
-  // gst_video_test_src_set_pattern (src, DEFAULT_PATTERN);
-
-  // src->timestamp_offset = DEFAULT_TIMESTAMP_OFFSET;
-  // src->foreground_color = DEFAULT_FOREGROUND_COLOR;
-  // src->background_color = DEFAULT_BACKGROUND_COLOR;
-  // src->horizontal_speed = DEFAULT_HORIZONTAL_SPEED;
-  // src->random_state = 0;
-
-  // /* we operate in time */
-  // gst_base_src_set_format (GST_BASE_SRC (src), GST_FORMAT_TIME);
-  // gst_base_src_set_live (GST_BASE_SRC (src), DEFAULT_IS_LIVE);
-
-  // src->animation_mode = DEFAULT_ANIMATION_MODE;
-  // src->motion_type = DEFAULT_MOTION_TYPE;
-  // src->flip = DEFAULT_FLIP;
-
 }
 
 static void
