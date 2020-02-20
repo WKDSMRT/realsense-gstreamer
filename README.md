@@ -8,30 +8,26 @@ The plugin is set up as a GstPushSrc, based on [gst-vision-plugins](https://gith
 [RealSense Reference](https://dev.intelrealsense.com/docs/api-architecture)
 
 ## Supported Models
-None yet. D435i will be the initial focus.
+- D435i 
+    - RGB stream is the default. A property will be added to set stream mode.
+    - Support for Depth and IMU will be added
 
 ## To Do
 ### Source
-- src/gstrealsenseplugin.cpp:90:// TODO update formats
-- src/gstrealsenseplugin.cpp:256:  /* TODO: use allocator or use from pool */
-- src/gstrealsenseplugin.cpp:261:  // TODO: update log
-- src/gstrealsenseplugin.cpp:274:  /* TODO: use orc_memcpy */
-- src/gstrealsenseplugin.cpp:314:  /* TODO: use timestamps */
-- src/gstrealsenseplugin.cpp:348:  // TODO need to set up format here
-- src/gstrealsenseplugin.c:105: *  TODO: This is where we'll need to define depth and IMU caps.
-- src/gstrealsenseplugin.c:306:  /* TODO: update caps */
-- src/gstrealsenseplugin.c:340:  /* TODO: check timestamps on buffers vs start time */
-- src/gstrealsenseplugin.c:492:  /* TODO: Get error messages */
-- set plugin defines specific to WKD.SMRT/RealSense
+- src/gstrealsenseplugin.cpp:83:// TODO update formats
+- src/gstrealsenseplugin.cpp:196:    // TODO properties
+- src/gstrealsenseplugin.cpp:209:    // TODO properties
+- src/gstrealsenseplugin.cpp:224:  /* TODO: use allocator or use from pool */
+- src/gstrealsenseplugin.cpp:229:  // TODO: update log
+- src/gstrealsenseplugin.cpp:239:  /* TODO: use orc_memcpy */
+- src/gstrealsenseplugin.cpp:289:  /* TODO: set timestamps */
+- src/gstrealsenseplugin.cpp:339:      // TODO need to set up format here
+
 ### Tests
 - Test application in Python or C++
+- The source may be run using gst-launch
+```
+gst-launch-1.0 -v -m realsensesrc ! videoconvert ! autovideosink
+```
 
 ## Known Issues
-- If the camera is not connected the plugin will fail to initialize. Running gst-inspect will give an error about "no valid klass field"
-
-```bash
-> gst-inspect-1.0 mbuild/src/libgstrealsensesrc.so
-
-(gst-inspect-1.0:24981): GStreamer-WARNING **: 20:31:47.666: Element factory metadata for 'realsensesrc' has no valid klass field
-Could not load plugin file: File "mbuild/src/libgstrealsensesrc.so" appears to be a GStreamer plugin, but it failed to initialize
-```
