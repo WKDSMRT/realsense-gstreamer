@@ -71,8 +71,9 @@ GST_DEBUG_CATEGORY_STATIC (gst_realsense_src_debug);
 enum
 {
   PROP_0,
-  // PROP_SILENT
+  PROP_CAM_SN
 };
+
 
 /* the capabilities of the inputs and outputs.
  *
@@ -153,6 +154,15 @@ gst_realsense_src_class_init (GstRealsenseSrcClass * klass)
   // gstbasesrc_class->decide_allocation = gst_video_test_src_decide_allocation;
 
   gstpushsrc_class->create = gst_realsense_src_create;
+
+  // Properties
+  g_object_class_install_property (
+    gobject_class, 
+    PROP_CAM_SN,
+    g_param_spec_string ("cam_serial_number", "cam_sn", "Camera serial number",
+      DEFAULT_PROP_CAM_SN, (GParamFlags) (G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS)
+    )
+  );
 }
 
 /* initialize the new element
@@ -173,10 +183,13 @@ gst_realsense_src_init (GstRealsenseSrc * src)
 static void
 gst_realsense_src_set_property (GObject * object, guint prop_id, const GValue * value, GParamSpec * pspec)
 {
-  // GstRealsenseSrc *src = GST_REALSENSESRC (object);
+  GstRealsenseSrc *src = GST_REALSENSESRC (object);
 
   switch (prop_id) {
     // TODO properties
+    case PROP_CAM_SN:
+      src->serial_number = std::string(g_value_get_string(value));
+      break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
       break;
@@ -186,10 +199,12 @@ gst_realsense_src_set_property (GObject * object, guint prop_id, const GValue * 
 static void
 gst_realsense_src_get_property (GObject * object, guint prop_id, GValue * value, GParamSpec * pspec)
 {
-  // GstRealsenseSrc *src = GST_REALSENSESRC (object);
+  GstRealsenseSrc *src = GST_REALSENSESRC (object);
 
   switch (prop_id) {
-    // TODO properties
+    case PROP_CAM_SN:
+      g_value_set_string(value, static_cast<const gchar*>(src->serial_number.c_str()));
+      break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
       break;
@@ -307,6 +322,45 @@ gst_realsense_src_start (GstBaseSrc * basesrc)
         // GST_ERROR_OBJECT(src, "Failed to create RealSense pipeline");
         return FALSE;
       }
+      rs2::config cfg;
+      
+      // we have to somehow populate this list!
+      rs2::context ctx;
+      const auto dev_list = ctx.query_devices();      
+      
+      if(dev_list.size() == 0)
+      {
+        GST_ELEMENT_ERROR (src, RESOURCE, FAILED, 
+        ("No RealSense devices found. Cannot start pipeline."),
+        (NULL));
+        return FALSE;
+      }
+
+      // for (const auto& val: dev_list)
+      // { }
+      auto val = dev_list.begin();
+      for(; val != dev_list.end(); ++val )
+      {
+        if(0 == src->serial_number.compare(val.operator*().get_info(RS2_CAMERA_INFO_SERIAL_NUMBER)))
+        {
+          break;
+        }
+      }
+      
+      // it might be good to split up this logic for clarity
+      if((val == dev_list.end()) || (src->serial_number == DEFAULT_PROP_CAM_SN))
+      {
+        GST_ELEMENT_WARNING (src, RESOURCE, FAILED, 
+          ("Specified serial number %s not found. Using first found device.", src->serial_number.c_str()),
+          (NULL));
+        cfg.enable_device(dev_list[0].get_info(RS2_CAMERA_INFO_SERIAL_NUMBER));
+      } 
+      else
+      {
+          cfg.enable_device(src->serial_number);
+      }
+      
+      cfg.enable_all_streams();
       // auto profile = src->rs_pipeline->get_active_profile();
       // auto streams = profile.get_streams();     
       // auto s0 = streams[0].get();
@@ -316,7 +370,7 @@ gst_realsense_src_start (GstBaseSrc * basesrc)
       // src->accum_frames = 0;
       // src->accum_rtime = 0;
 
-      src->rs_pipeline->start();
+      src->rs_pipeline->start(cfg);
       GST_LOG_OBJECT(src, "RealSense pipeline started");
 
       // TODO need to set up format here
