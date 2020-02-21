@@ -12,16 +12,21 @@ None yet. D435i will be the initial focus.
 
 ## To Do
 ### Source
-- src/gstrealsenseplugin.cpp:90:// TODO update formats
-- src/gstrealsenseplugin.cpp:256:  /* TODO: use allocator or use from pool */
-- src/gstrealsenseplugin.cpp:261:  // TODO: update log
-- src/gstrealsenseplugin.cpp:274:  /* TODO: use orc_memcpy */
-- src/gstrealsenseplugin.cpp:314:  /* TODO: use timestamps */
-- src/gstrealsenseplugin.cpp:348:  // TODO need to set up format here
-- src/gstrealsenseplugin.c:105: *  TODO: This is where we'll need to define depth and IMU caps.
-- src/gstrealsenseplugin.c:306:  /* TODO: update caps */
-- src/gstrealsenseplugin.c:340:  /* TODO: check timestamps on buffers vs start time */
-- src/gstrealsenseplugin.c:492:  /* TODO: Get error messages */
+- Test alignment property
+    - need depth data first
+- Figure out what's wrong with serial number property
+- Add Depth channel
+- Add IMU data
+- Add metadata
+- add clocking
+- src/gstrealsenseplugin.cpp:85:// TODO update formats
+- src/gstrealsenseplugin.cpp:204:    // TODO properties
+- src/gstrealsenseplugin.cpp:251:  /* TODO: use allocator or use from pool */
+- src/gstrealsenseplugin.cpp:256:  // TODO: update log
+- src/gstrealsenseplugin.cpp:266:  /* TODO: use orc_memcpy */
+- src/gstrealsenseplugin.cpp:317:  /* TODO: set timestamps */
+- src/gstrealsenseplugin.cpp:403:      // TODO Handle alignment here
+- src/gstrealsenseplugin.cpp:424:      // TODO need to set up format here
 - set plugin defines specific to WKD.SMRT/RealSense
 ### Tests
 - Test application in Python or C++
