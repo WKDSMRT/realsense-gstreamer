@@ -89,6 +89,7 @@ struct _GstRealsenseSrc
   // Realsense vars
   rs_pipe_ptr rs_pipeline = nullptr;
   std::string serial_number; 
+  // gchar* serial_numer;
 };
 
 struct _GstRealsenseSrcClass 

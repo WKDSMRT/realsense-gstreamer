@@ -159,10 +159,16 @@ gst_realsense_src_class_init (GstRealsenseSrcClass * klass)
   g_object_class_install_property (
     gobject_class, 
     PROP_CAM_SN,
-    g_param_spec_string ("cam_serial_number", "cam_sn", "Camera serial number",
-      DEFAULT_PROP_CAM_SN, (GParamFlags) (G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS)
-    )
-  );
+    g_param_spec_uint ("cam-serial-number", "cam-sn",
+          "Camera serial number (as unsigned int)", 0, G_MAXUINT32,
+          0,
+          (GParamFlags) (G_PARAM_READWRITE | GST_PARAM_CONTROLLABLE | G_PARAM_STATIC_STRINGS)
+        )
+    );
+    // g_param_spec_string ("cam-serial-number", "cam-sn", "Camera serial number",
+    //   DEFAULT_PROP_CAM_SN, 
+    //   (GParamFlags) (G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS)
+    // )
 }
 
 /* initialize the new element
@@ -185,10 +191,13 @@ gst_realsense_src_set_property (GObject * object, guint prop_id, const GValue * 
 {
   GstRealsenseSrc *src = GST_REALSENSESRC (object);
 
-  switch (prop_id) {
+  switch (prop_id) 
+  {
     // TODO properties
     case PROP_CAM_SN:
-      src->serial_number = std::string(g_value_get_string(value));
+      // src->serial_number = std::to_string(g_value_get_uint(value));
+      GST_ELEMENT_WARNING (src, RESOURCE, SETTINGS, ("Received serial number %s.", src->serial_number.c_str()), (NULL));
+      // src->serial_number = std::string(g_value_dup_string(value));
       break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -201,9 +210,15 @@ gst_realsense_src_get_property (GObject * object, guint prop_id, GValue * value,
 {
   GstRealsenseSrc *src = GST_REALSENSESRC (object);
 
+  // needs to be outside switch? why?
+  char* begin = (char*)src->serial_number.data();
+  char* end = begin + src->serial_number.length();
+  auto sn = strtol(begin, &end, 10);
+  
   switch (prop_id) {
     case PROP_CAM_SN:
-      g_value_set_string(value, static_cast<const gchar*>(src->serial_number.c_str()));
+      // g_value_set_string(value, static_cast<const gchar*>(src->serial_number.c_str()));
+      // g_value_set_uint(value, sn);
       break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
