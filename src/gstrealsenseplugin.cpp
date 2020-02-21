@@ -71,7 +71,8 @@ GST_DEBUG_CATEGORY_STATIC (gst_realsense_src_debug);
 enum
 {
   PROP_0,
-  PROP_CAM_SN
+  PROP_CAM_SN,
+  PROP_ALIGN
 };
 
 
@@ -156,6 +157,13 @@ gst_realsense_src_class_init (GstRealsenseSrcClass * klass)
   gstpushsrc_class->create = gst_realsense_src_create;
 
   // Properties
+  // see Pattern property in VideoTestSrc for usage of enum propert
+    g_object_class_install_property (gobject_class, PROP_ALIGN,
+      g_param_spec_int ("align", "Alignment",
+          "Alignment between Color and Depth sensors.",
+          Align::None, Align::Depth, 0,
+          (GParamFlags)(G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS)));
+
   g_object_class_install_property (
     gobject_class, 
     PROP_CAM_SN,
@@ -199,6 +207,9 @@ gst_realsense_src_set_property (GObject * object, guint prop_id, const GValue * 
       GST_ELEMENT_WARNING (src, RESOURCE, SETTINGS, ("Received serial number %s.", src->serial_number.c_str()), (NULL));
       // src->serial_number = std::string(g_value_dup_string(value));
       break;
+    case PROP_ALIGN:
+      src->align = static_cast<Align>(g_value_get_int(value));
+      break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
       break;
@@ -219,6 +230,9 @@ gst_realsense_src_get_property (GObject * object, guint prop_id, GValue * value,
     case PROP_CAM_SN:
       // g_value_set_string(value, static_cast<const gchar*>(src->serial_number.c_str()));
       // g_value_set_uint(value, sn);
+      break;
+    case PROP_ALIGN:
+      g_value_set_int(value, src->align);
       break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -282,14 +296,15 @@ gst_realsense_src_create (GstPushSrc * psrc, GstBuffer ** buf)
   /* wait for next frame to be available */
   try 
   {
-    auto frame = src->rs_pipeline->wait_for_frames();
-
+    auto frame_set = src->rs_pipeline->wait_for_frames();
+    if(src->aligner != nullptr)
+      src->aligner->process(frame_set);
     // clock = gst_element_get_clock (GST_ELEMENT (src));
     // clock_time = gst_clock_get_time (clock);
     // gst_object_unref (clock);
 
     /* create GstBuffer then release */
-    *buf = gst_realsense_src_create_buffer_from_frameset(src, frame);
+    *buf = gst_realsense_src_create_buffer_from_frameset(src, frame_set);
   }
   catch (rs2::error & e)
   {
@@ -384,12 +399,29 @@ gst_realsense_src_start (GstBaseSrc * basesrc)
       // src->n_frames = 0;
       // src->accum_frames = 0;
       // src->accum_rtime = 0;
-
+      
+      // TODO Handle alignment here
+      switch(src->align)
+      {
+        case Align::None:
+          break;
+        case Align::Color:
+          src->aligner = std::make_unique<rs2::align>(RS2_STREAM_COLOR);
+          break;
+        case Align::Depth:
+          src->aligner = std::make_unique<rs2::align>(RS2_STREAM_DEPTH);
+          break;
+        default:
+          GST_ELEMENT_WARNING (src, RESOURCE, SETTINGS, ("Unknown alignment parameter %d", src->align), (NULL));
+      }
       src->rs_pipeline->start(cfg);
       GST_LOG_OBJECT(src, "RealSense pipeline started");
 
-      // TODO need to set up format here
       auto frame_set = src->rs_pipeline->wait_for_frames();
+      if(src->aligner != nullptr)
+        src->aligner->process(frame_set);
+      
+      // TODO need to set up format here
       auto cframe = frame_set.get_color_frame();
       auto height = cframe.get_height();
       // auto height = vf.get_height();
