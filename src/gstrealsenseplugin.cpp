@@ -72,7 +72,8 @@ enum
 {
   PROP_0,
   PROP_CAM_SN,
-  PROP_ALIGN
+  PROP_ALIGN,
+  PROP_DEPTH_ON
 };
 
 
@@ -158,11 +159,16 @@ gst_realsense_src_class_init (GstRealsenseSrcClass * klass)
 
   // Properties
   // see Pattern property in VideoTestSrc for usage of enum propert
-    g_object_class_install_property (gobject_class, PROP_ALIGN,
-      g_param_spec_int ("align", "Alignment",
-          "Alignment between Color and Depth sensors.",
-          Align::None, Align::Depth, 0,
-          (GParamFlags)(G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS)));
+  g_object_class_install_property (gobject_class, PROP_ALIGN,
+    g_param_spec_int ("align", "Alignment",
+        "Alignment between Color and Depth sensors.",
+        Align::None, Align::Depth, 0,
+        (GParamFlags)(G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS)));
+  
+  g_object_class_install_property (gobject_class, PROP_DEPTH_ON,
+    g_param_spec_boolean ("enable-depth", "Enable Depth",
+        "Enable streaming of depth data", FALSE,
+        (GParamFlags)(G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS)));
 
   g_object_class_install_property (
     gobject_class, 
@@ -210,6 +216,9 @@ gst_realsense_src_set_property (GObject * object, guint prop_id, const GValue * 
     case PROP_ALIGN:
       src->align = static_cast<Align>(g_value_get_int(value));
       break;
+    case PROP_DEPTH_ON:
+      src->is_stream_depth = g_value_get_boolean(value);
+      break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
       break;
@@ -234,6 +243,9 @@ gst_realsense_src_get_property (GObject * object, guint prop_id, GValue * value,
     case PROP_ALIGN:
       g_value_set_int(value, src->align);
       break;
+    case PROP_DEPTH_ON:
+      g_value_set_boolean(value, src->is_stream_depth);
+      break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
       break;
@@ -247,11 +259,12 @@ gst_realsense_src_create_buffer_from_frameset (GstRealsenseSrc * src, rs2::frame
   GstBuffer *buf;
 
   auto cframe = frame_set.get_color_frame();
-
+  auto color_sz = cframe.get_height() * src->gst_stride;
+  auto depth = frame_set.get_depth_frame();
+  auto depth_sz = depth.get_data_size();
   /* TODO: use allocator or use from pool */
-  buf = gst_buffer_new_and_alloc (cframe.get_height() * src->gst_stride);
+  buf = gst_buffer_new_and_alloc (color_sz + depth_sz);
 
-  /* Copy image to buffer from surface */
   gst_buffer_map (buf, &minfo, GST_MAP_WRITE);
   // TODO: update log
   // GST_LOG_OBJECT (src,
@@ -266,7 +279,7 @@ gst_realsense_src_create_buffer_from_frameset (GstRealsenseSrc * src, rs2::frame
   /* TODO: use orc_memcpy */
   if (src->gst_stride == rs_stride) 
   {
-    memcpy (minfo.data, ((guint8 *) cframe.get_data()), minfo.size);
+    memcpy (minfo.data, ((guint8 *) cframe.get_data()), color_sz);
   } 
   else 
   {
@@ -278,6 +291,12 @@ gst_realsense_src_create_buffer_from_frameset (GstRealsenseSrc * src, rs2::frame
           ((guint8 *) cframe.get_data()) +
           i * rs_stride, rs_stride);
     }
+  }
+  // Just cram the depth data into the buffer. We can write a filter to 
+  // seperate RGB and Depth, or consuming elements can do this themselves
+  if(src->is_stream_depth)
+  {
+    memcpy(minfo.data + color_sz, depth.get_data(), depth_sz);
   }
   gst_buffer_unmap (buf, &minfo);
 
@@ -429,6 +448,12 @@ gst_realsense_src_start (GstBaseSrc * basesrc)
       auto rs_format = cframe.get_profile().format();
       // rs2_frame_metadata_value
       // auto raw_rs_size = vf.get_frame_metadata(RS2_FRAME_METADATA_RAW_FRAME_SIZE);
+      if(src->is_stream_depth)
+      {
+        auto depth = frame_set.get_depth_frame();
+        auto depth_height = depth.get_height();
+        height += (depth_height * depth.get_stride_in_bytes()) / cframe.get_stride_in_bytes();
+      }
 
       gst_video_info_init(&src->info);
 

@@ -16,6 +16,7 @@ None yet. D435i will be the initial focus.
     - need depth data first
 - Figure out what's wrong with serial number property
 - Add Depth channel
+    - I've attempted to extend the output buffer and pack the depth data into that buffer. The consumer will need to unpack it. The format, frame size, stride for color and depth will need to be passed thru the pipeline 
 - Add IMU data
 - Add metadata
 - add clocking
@@ -28,6 +29,8 @@ None yet. D435i will be the initial focus.
 - src/gstrealsenseplugin.cpp:403:      // TODO Handle alignment here
 - src/gstrealsenseplugin.cpp:424:      // TODO need to set up format here
 - set plugin defines specific to WKD.SMRT/RealSense
+- Maybe add capability to generate synthetic data if no camera is connected.
+    - Should be develop mode only
 ### Tests
 - Test application in Python or C++
 

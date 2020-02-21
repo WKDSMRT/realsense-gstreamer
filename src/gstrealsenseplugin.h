@@ -101,6 +101,7 @@ struct _GstRealsenseSrc
   // Properties
   Align align = Align::None;
   std::string serial_number; 
+  bool is_stream_depth = false;
   // gchar* serial_numer;
 };
 
