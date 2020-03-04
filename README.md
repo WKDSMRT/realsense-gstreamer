@@ -8,18 +8,17 @@ The plugin is set up as a GstPushSrc, based on [gst-vision-plugins](https://gith
 [RealSense Reference](https://dev.intelrealsense.com/docs/api-architecture)
 
 ## Supported Models
-None yet. D435i will be the initial focus.
+D435i is currently supported with limitations.
 
 ## To Do
 ### Source
+- add clocking
+- Add metadata
 - Test alignment property
-    - need depth data first
-- Figure out what's wrong with serial number property
+    - Something is coming thru. Need demuxer to see data
 - Add Depth channel
     - I've attempted to extend the output buffer and pack the depth data into that buffer. The consumer will need to unpack it. The format, frame size, stride for color and depth will need to be passed thru the pipeline 
 - Add IMU data
-- Add metadata
-- add clocking
 - src/gstrealsenseplugin.cpp:85:// TODO update formats
 - src/gstrealsenseplugin.cpp:204:    // TODO properties
 - src/gstrealsenseplugin.cpp:251:  /* TODO: use allocator or use from pool */
@@ -31,6 +30,7 @@ None yet. D435i will be the initial focus.
 - set plugin defines specific to WKD.SMRT/RealSense
 - Maybe add capability to generate synthetic data if no camera is connected.
     - Should be develop mode only
+
 ### Tests
 - Test application in Python or C++
 
