@@ -73,7 +73,7 @@ typedef struct _GstRealsenseSrcClass GstRealsenseSrcClass;
 
 using rs_pipe_ptr = std::unique_ptr<rs2::pipeline>;
 using rs_aligner_ptr = std::unique_ptr<rs2::align>;
-constexpr const auto DEFAULT_PROP_CAM_SN = "NA";
+constexpr const auto DEFAULT_PROP_CAM_SN = 0;
 
 enum Align
 {
@@ -100,9 +100,8 @@ struct _GstRealsenseSrc
 
   // Properties
   Align align = Align::None;
-  std::string serial_number; 
+  guint serial_number = 0;
   bool is_stream_depth = false;
-  // gchar* serial_numer;
 };
 
 struct _GstRealsenseSrcClass 

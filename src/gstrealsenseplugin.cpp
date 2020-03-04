@@ -174,15 +174,11 @@ gst_realsense_src_class_init (GstRealsenseSrcClass * klass)
     gobject_class, 
     PROP_CAM_SN,
     g_param_spec_uint ("cam-serial-number", "cam-sn",
-          "Camera serial number (as unsigned int)", 0, G_MAXUINT32,
-          0,
+          "Camera serial number (as unsigned int)", 
+          0, G_MAXUINT32, 0,
           (GParamFlags) (G_PARAM_READWRITE | GST_PARAM_CONTROLLABLE | G_PARAM_STATIC_STRINGS)
         )
     );
-    // g_param_spec_string ("cam-serial-number", "cam-sn", "Camera serial number",
-    //   DEFAULT_PROP_CAM_SN, 
-    //   (GParamFlags) (G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS)
-    // )
 }
 
 /* initialize the new element
@@ -209,9 +205,8 @@ gst_realsense_src_set_property (GObject * object, guint prop_id, const GValue * 
   {
     // TODO properties
     case PROP_CAM_SN:
-      // src->serial_number = std::to_string(g_value_get_uint(value));
-      GST_ELEMENT_WARNING (src, RESOURCE, SETTINGS, ("Received serial number %s.", src->serial_number.c_str()), (NULL));
-      // src->serial_number = std::string(g_value_dup_string(value));
+      src->serial_number = g_value_get_uint(value);
+      GST_ELEMENT_WARNING (src, RESOURCE, SETTINGS, ("Received serial number %u.", src->serial_number), (NULL));
       break;
     case PROP_ALIGN:
       src->align = static_cast<Align>(g_value_get_int(value));
@@ -229,16 +224,10 @@ static void
 gst_realsense_src_get_property (GObject * object, guint prop_id, GValue * value, GParamSpec * pspec)
 {
   GstRealsenseSrc *src = GST_REALSENSESRC (object);
-
-  // needs to be outside switch? why?
-  char* begin = (char*)src->serial_number.data();
-  char* end = begin + src->serial_number.length();
-  auto sn = strtol(begin, &end, 10);
   
   switch (prop_id) {
     case PROP_CAM_SN:
-      // g_value_set_string(value, static_cast<const gchar*>(src->serial_number.c_str()));
-      // g_value_set_uint(value, sn);
+      g_value_set_uint(value, src->serial_number);
       break;
     case PROP_ALIGN:
       g_value_set_int(value, src->align);
@@ -373,10 +362,10 @@ gst_realsense_src_start (GstBaseSrc * basesrc)
       }
       rs2::config cfg;
       
-      // we have to somehow populate this list!
       rs2::context ctx;
       const auto dev_list = ctx.query_devices();      
-      
+      const auto serial_number = std::to_string(src->serial_number);
+
       if(dev_list.size() == 0)
       {
         GST_ELEMENT_ERROR (src, RESOURCE, FAILED, 
@@ -385,12 +374,10 @@ gst_realsense_src_start (GstBaseSrc * basesrc)
         return FALSE;
       }
 
-      // for (const auto& val: dev_list)
-      // { }
       auto val = dev_list.begin();
       for(; val != dev_list.end(); ++val )
       {
-        if(0 == src->serial_number.compare(val.operator*().get_info(RS2_CAMERA_INFO_SERIAL_NUMBER)))
+        if(0 == serial_number.compare(val.operator*().get_info(RS2_CAMERA_INFO_SERIAL_NUMBER)))
         {
           break;
         }
@@ -400,13 +387,13 @@ gst_realsense_src_start (GstBaseSrc * basesrc)
       if((val == dev_list.end()) || (src->serial_number == DEFAULT_PROP_CAM_SN))
       {
         GST_ELEMENT_WARNING (src, RESOURCE, FAILED, 
-          ("Specified serial number %s not found. Using first found device.", src->serial_number.c_str()),
+          ("Specified serial number %u not found. Using first found device.", src->serial_number),
           (NULL));
         cfg.enable_device(dev_list[0].get_info(RS2_CAMERA_INFO_SERIAL_NUMBER));
       } 
       else
-      {
-          cfg.enable_device(src->serial_number);
+      {          
+          cfg.enable_device(serial_number);
       }
       
       cfg.enable_all_streams();
@@ -419,7 +406,6 @@ gst_realsense_src_start (GstBaseSrc * basesrc)
       // src->accum_frames = 0;
       // src->accum_rtime = 0;
       
-      // TODO Handle alignment here
       switch(src->align)
       {
         case Align::None:
