@@ -259,14 +259,10 @@ gst_realsense_src_create_buffer_from_frameset (GstRealsenseSrc * src, rs2::frame
   buf = gst_buffer_new_and_alloc (color_sz + depth_sz);
 
   gst_buffer_map (buf, &minfo, GST_MAP_WRITE);
-  // TODO: update log
-  // GST_LOG_OBJECT (src,
-  //     "GstBuffer size=%d, gst_stride=%d, buffer_num=%d, frame_count=%d, num_frames_on_queue=%d",
-  //     minfo.size, src->gst_stride, circ_handle->BufferNumber,
-  //     circ_handle->FrameCount, circ_handle->NumItemsOnQueue);
-  // GST_LOG_OBJECT (src, "Buffer timestamp %02d:%02d:%02d.%06d",
-  //     circ_handle->HiResTimeStamp.hour, circ_handle->HiResTimeStamp.min,
-  //     circ_handle->HiResTimeStamp.sec, circ_handle->HiResTimeStamp.usec);
+  GST_LOG_OBJECT (src,
+      "GstBuffer size=%lu, gst_stride=%d, frame_num=%llu",
+      minfo.size, src->gst_stride, cframe.get_frame_number());
+  GST_LOG_OBJECT (src, "Buffer timestamp %f", cframe.get_timestamp());
 
   // TODO refactor this section into cleaner code
   int rs_stride = 0;
