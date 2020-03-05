@@ -166,9 +166,13 @@ gst_realsense_src_class_init (GstRealsenseSrcClass * klass)
         (GParamFlags)(G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS)));
   
   g_object_class_install_property (gobject_class, PROP_DEPTH_ON,
-    g_param_spec_boolean ("enable-depth", "Enable Depth",
-        "Enable streaming of depth data", FALSE,
+    g_param_spec_int ("enable-depth", "Enable Depth",
+        "Enable streaming of depth data",
+        StreamType::StreamColor, StreamType::StreamMux, StreamType::StreamDepth,
         (GParamFlags)(G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS)));
+    // g_param_spec_boolean ("enable-depth", "Enable Depth",
+    //     "Enable streaming of depth data", FALSE,
+    //     (GParamFlags)(G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS)));
 
   g_object_class_install_property (
     gobject_class, 
@@ -212,7 +216,7 @@ gst_realsense_src_set_property (GObject * object, guint prop_id, const GValue * 
       src->align = static_cast<Align>(g_value_get_int(value));
       break;
     case PROP_DEPTH_ON:
-      src->is_stream_depth = g_value_get_boolean(value);
+      src->stream_type = static_cast<StreamType>(g_value_get_int(value));
       break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -233,7 +237,7 @@ gst_realsense_src_get_property (GObject * object, guint prop_id, GValue * value,
       g_value_set_int(value, src->align);
       break;
     case PROP_DEPTH_ON:
-      g_value_set_boolean(value, src->is_stream_depth);
+      g_value_set_int(value, src->stream_type);
       break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -251,7 +255,7 @@ gst_realsense_src_create_buffer_from_frameset (GstRealsenseSrc * src, rs2::frame
   auto color_sz = cframe.get_height() * src->gst_stride;
   auto depth = frame_set.get_depth_frame();
   auto depth_sz = depth.get_data_size();
-  /* TODO: use allocator or use from pool */
+  /* TODO: use allocator or use from pool if that's more efficient or safer*/
   buf = gst_buffer_new_and_alloc (color_sz + depth_sz);
 
   gst_buffer_map (buf, &minfo, GST_MAP_WRITE);
@@ -264,29 +268,57 @@ gst_realsense_src_create_buffer_from_frameset (GstRealsenseSrc * src, rs2::frame
   //     circ_handle->HiResTimeStamp.hour, circ_handle->HiResTimeStamp.min,
   //     circ_handle->HiResTimeStamp.sec, circ_handle->HiResTimeStamp.usec);
 
-  auto rs_stride = cframe.get_stride_in_bytes();
-  /* TODO: use orc_memcpy */
-  if (src->gst_stride == rs_stride) 
+  // TODO refactor this section into cleaner code
+  int rs_stride = 0;
+  if(src->stream_type == StreamType::StreamColor || src->stream_type == StreamType::StreamMux) 
   {
-    memcpy (minfo.data, ((guint8 *) cframe.get_data()), color_sz);
-  } 
-  else 
-  {
-    int i;
-    GST_LOG_OBJECT (src, "Image strides not identical, copy will be slower.");
-    for (i = 0; i < src->height; i++) 
+    rs_stride = cframe.get_stride_in_bytes();
+      /* TODO: use orc_memcpy */
+    if (src->gst_stride == rs_stride) 
     {
-      memcpy (minfo.data + i * src->gst_stride,
-          ((guint8 *) cframe.get_data()) +
-          i * rs_stride, rs_stride);
+      memcpy (minfo.data, ((guint8 *) cframe.get_data()), color_sz);
+    } 
+    else 
+    {
+      int i;
+      GST_LOG_OBJECT (src, "Image strides not identical, copy will be slower.");
+      for (i = 0; i < src->height; i++) 
+      {
+        memcpy (minfo.data + i * src->gst_stride,
+            ((guint8 *) cframe.get_data()) +
+            i * rs_stride, rs_stride);
+      }
+    }
+
+    // Just cram the depth data into the buffer. We can write a filter to 
+    // separate RGB and Depth, or consuming elements can do this themselves
+    if(src->stream_type == StreamType::StreamMux)
+    {
+      memcpy(minfo.data + color_sz, depth.get_data(), depth_sz);
     }
   }
-  // Just cram the depth data into the buffer. We can write a filter to 
-  // seperate RGB and Depth, or consuming elements can do this themselves
-  if(src->is_stream_depth)
+  else //implied src->stream_type == StreamType::Depth
   {
-    memcpy(minfo.data + color_sz, depth.get_data(), depth_sz);
+    rs_stride = depth.get_stride_in_bytes();
+      /* TODO: use orc_memcpy */
+    if (src->gst_stride == rs_stride) 
+    {
+      memcpy (minfo.data, ((guint8 *) depth.get_data()), depth_sz);
+    } 
+    else 
+    {
+      int i;
+      GST_LOG_OBJECT (src, "Image strides not identical, copy will be slower.");
+      for (i = 0; i < src->height; i++) 
+      {
+        memcpy (minfo.data + i * src->gst_stride,
+            ((guint8 *) depth.get_data()) +
+            i * rs_stride, rs_stride);
+      }
+    }
   }
+  
+
   gst_buffer_unmap (buf, &minfo);
 
   return buf;
@@ -296,9 +328,7 @@ static GstFlowReturn
 gst_realsense_src_create (GstPushSrc * psrc, GstBuffer ** buf)
 {
   GstRealsenseSrc *src = GST_REALSENSESRC (psrc);
-  // GstClock *clock;
-  // GstClockTime clock_time;
-
+  
   GST_LOG_OBJECT (src, "create");
 
   /* wait for next frame to be available */
@@ -307,12 +337,18 @@ gst_realsense_src_create (GstPushSrc * psrc, GstBuffer ** buf)
     auto frame_set = src->rs_pipeline->wait_for_frames();
     if(src->aligner != nullptr)
       src->aligner->process(frame_set);
-    // clock = gst_element_get_clock (GST_ELEMENT (src));
-    // clock_time = gst_clock_get_time (clock);
-    // gst_object_unref (clock);
+    
+    const auto clock = gst_element_get_clock (GST_ELEMENT (src));
+    const auto clock_time = gst_clock_get_time (clock);
+    gst_object_unref (clock);
 
     /* create GstBuffer then release */
     *buf = gst_realsense_src_create_buffer_from_frameset(src, frame_set);
+
+    GST_BUFFER_TIMESTAMP (*buf) =
+        GST_CLOCK_DIFF (gst_element_get_base_time (GST_ELEMENT (src)),
+        clock_time);
+    GST_BUFFER_OFFSET (*buf) = frame_set.get_frame_number();
   }
   catch (rs2::error & e)
   {
@@ -322,14 +358,6 @@ gst_realsense_src_create (GstPushSrc * psrc, GstBuffer ** buf)
     return GST_FLOW_ERROR;
   }
 
-  /* TODO: set timestamps */
-  //GST_BUFFER_TIMESTAMP (*buf) =
-  //    GST_CLOCK_DIFF (gst_element_get_base_time (GST_ELEMENT (src)),
-  //    src->acq_start_time + circ_handle.HiResTimeStamp.totalSec * GST_SECOND);
-  // GST_BUFFER_TIMESTAMP (*buf) =
-  //     GST_CLOCK_DIFF (gst_element_get_base_time (GST_ELEMENT (src)),
-  //     clock_time);
-  // GST_BUFFER_OFFSET (*buf) = circ_handle.FrameCount - 1;
 
   // if (src->stop_requested) {
   //   if (*buf != NULL) {
@@ -393,7 +421,7 @@ gst_realsense_src_start (GstBaseSrc * basesrc)
       } 
       else
       {          
-          cfg.enable_device(serial_number);
+        cfg.enable_device(serial_number);
       }
       
       cfg.enable_all_streams();
@@ -426,17 +454,34 @@ gst_realsense_src_start (GstBaseSrc * basesrc)
       if(src->aligner != nullptr)
         src->aligner->process(frame_set);
       
-      // TODO need to set up format here
-      auto cframe = frame_set.get_color_frame();
-      auto height = cframe.get_height();
-      // auto height = vf.get_height();
-      auto width = cframe.get_width();
-      auto rs_format = cframe.get_profile().format();
-      // rs2_frame_metadata_value
-      // auto raw_rs_size = vf.get_frame_metadata(RS2_FRAME_METADATA_RAW_FRAME_SIZE);
-      if(src->is_stream_depth)
+      int height = 0;
+      int width = 0;
+      rs2_format rs_format = RS2_FORMAT_COUNT;
+      if(src->stream_type == StreamType::StreamColor)
+      {
+        auto cframe = frame_set.get_color_frame();
+        height = cframe.get_height();
+        width = cframe.get_width();
+        rs_format = cframe.get_profile().format();
+        // rs2_frame_metadata_value
+        // auto raw_rs_size = vf.get_frame_metadata(RS2_FRAME_METADATA_RAW_FRAME_SIZE);
+      }
+      else if(src->stream_type == StreamType::StreamDepth)
       {
         auto depth = frame_set.get_depth_frame();
+        height = depth.get_height();
+        width = depth.get_width();
+        rs_format = depth.get_profile().format();
+      }
+      else if(src->stream_type == StreamType::StreamMux)
+      {
+        auto depth = frame_set.get_depth_frame();
+        auto cframe = frame_set.get_color_frame();
+
+        height = cframe.get_height();
+        width = cframe.get_width();
+        rs_format = cframe.get_profile().format();
+
         auto depth_height = depth.get_height();
         height += (depth_height * depth.get_stride_in_bytes()) / cframe.get_stride_in_bytes();
       }
@@ -456,6 +501,7 @@ gst_realsense_src_start (GstBaseSrc * basesrc)
         case RS2_FORMAT_BGRA8:
           gst_video_info_set_format(&src->info, GST_VIDEO_FORMAT_BGRA, width, height);
           break;
+        case RS2_FORMAT_Z16:
         case RS2_FORMAT_RAW16:
         case RS2_FORMAT_Y16:
           if (G_BYTE_ORDER == G_LITTLE_ENDIAN) 

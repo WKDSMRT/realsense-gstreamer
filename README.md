@@ -19,14 +19,14 @@ D435i is currently supported with limitations.
 - Add Depth channel
     - I've attempted to extend the output buffer and pack the depth data into that buffer. The consumer will need to unpack it. The format, frame size, stride for color and depth will need to be passed thru the pipeline 
 - Add IMU data
-- src/gstrealsenseplugin.cpp:85:// TODO update formats
-- src/gstrealsenseplugin.cpp:204:    // TODO properties
-- src/gstrealsenseplugin.cpp:251:  /* TODO: use allocator or use from pool */
-- src/gstrealsenseplugin.cpp:256:  // TODO: update log
-- src/gstrealsenseplugin.cpp:266:  /* TODO: use orc_memcpy */
-- src/gstrealsenseplugin.cpp:317:  /* TODO: set timestamps */
-- src/gstrealsenseplugin.cpp:403:      // TODO Handle alignment here
-- src/gstrealsenseplugin.cpp:424:      // TODO need to set up format here
+- src/gstrealsenseplugin.cpp:86:// TODO update formats
+- src/gstrealsenseplugin.cpp:210:    // TODO properties
+- src/gstrealsenseplugin.cpp:258:  /* TODO: use allocator or use from pool if that's more efficient or safer*/
+- src/gstrealsenseplugin.cpp:262:  // TODO: update log
+- src/gstrealsenseplugin.cpp:271:  // TODO refactor this section into cleaner code
+- src/gstrealsenseplugin.cpp:276:      /* TODO: use orc_memcpy */
+- src/gstrealsenseplugin.cpp:303:      /* TODO: use orc_memcpy */
+- src/gstrealsenseplugin.cpp:347:    /* TODO: set timestamps */
 - set plugin defines specific to WKD.SMRT/RealSense
 - Maybe add capability to generate synthetic data if no camera is connected.
     - Should be develop mode only

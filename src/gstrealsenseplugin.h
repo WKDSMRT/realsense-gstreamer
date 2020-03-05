@@ -82,6 +82,13 @@ enum Align
   Depth
 };
 
+enum StreamType
+{
+  StreamColor,
+  StreamDepth,
+  StreamMux // Color and depth crammed into the same buffer
+};
+
 struct _GstRealsenseSrc
 {
   GstPushSrc element;
@@ -101,7 +108,7 @@ struct _GstRealsenseSrc
   // Properties
   Align align = Align::None;
   guint serial_number = 0;
-  bool is_stream_depth = false;
+  StreamType stream_type = StreamType::StreamDepth;
 };
 
 struct _GstRealsenseSrcClass 
