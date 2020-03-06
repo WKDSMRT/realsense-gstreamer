@@ -166,20 +166,17 @@ gst_realsense_src_class_init (GstRealsenseSrcClass * klass)
         (GParamFlags)(G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS)));
   
   g_object_class_install_property (gobject_class, PROP_DEPTH_ON,
-    g_param_spec_int ("enable-depth", "Enable Depth",
+    g_param_spec_int ("stream-type", "Enable Depth",
         "Enable streaming of depth data",
         StreamType::StreamColor, StreamType::StreamMux, StreamType::StreamDepth,
         (GParamFlags)(G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS)));
-    // g_param_spec_boolean ("enable-depth", "Enable Depth",
-    //     "Enable streaming of depth data", FALSE,
-    //     (GParamFlags)(G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS)));
 
   g_object_class_install_property (
     gobject_class, 
     PROP_CAM_SN,
-    g_param_spec_uint ("cam-serial-number", "cam-sn",
+    g_param_spec_uint64 ("cam-serial-number", "cam-sn",
           "Camera serial number (as unsigned int)", 
-          0, G_MAXUINT32, 0,
+          0, G_MAXUINT64, 0,
           (GParamFlags) (G_PARAM_READWRITE | GST_PARAM_CONTROLLABLE | G_PARAM_STATIC_STRINGS)
         )
     );
@@ -209,8 +206,8 @@ gst_realsense_src_set_property (GObject * object, guint prop_id, const GValue * 
   {
     // TODO properties
     case PROP_CAM_SN:
-      src->serial_number = g_value_get_uint(value);
-      GST_ELEMENT_WARNING (src, RESOURCE, SETTINGS, ("Received serial number %u.", src->serial_number), (NULL));
+      src->serial_number = g_value_get_uint64(value);
+      GST_ELEMENT_WARNING (src, RESOURCE, SETTINGS, ("Received serial number %lu.", src->serial_number), (NULL));
       break;
     case PROP_ALIGN:
       src->align = static_cast<Align>(g_value_get_int(value));
@@ -231,7 +228,7 @@ gst_realsense_src_get_property (GObject * object, guint prop_id, GValue * value,
   
   switch (prop_id) {
     case PROP_CAM_SN:
-      g_value_set_uint(value, src->serial_number);
+      g_value_set_uint64(value, src->serial_number);
       break;
     case PROP_ALIGN:
       g_value_set_int(value, src->align);
@@ -411,7 +408,7 @@ gst_realsense_src_start (GstBaseSrc * basesrc)
       if((val == dev_list.end()) || (src->serial_number == DEFAULT_PROP_CAM_SN))
       {
         GST_ELEMENT_WARNING (src, RESOURCE, FAILED, 
-          ("Specified serial number %u not found. Using first found device.", src->serial_number),
+          ("Specified serial number %lu not found. Using first found device.", src->serial_number),
           (NULL));
         cfg.enable_device(dev_list[0].get_info(RS2_CAMERA_INFO_SERIAL_NUMBER));
       } 

@@ -107,7 +107,7 @@ struct _GstRealsenseSrc
 
   // Properties
   Align align = Align::None;
-  guint serial_number = 0;
+  guint64 serial_number = 0;
   StreamType stream_type = StreamType::StreamDepth;
 };
 
