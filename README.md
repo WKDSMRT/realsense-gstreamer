@@ -12,7 +12,6 @@ D435i is currently supported with limitations.
 
 ## To Do
 ### Source
-- add clocking
 - Add metadata
 - Test alignment property
     - Something is coming thru. Need demuxer to see data
@@ -22,11 +21,9 @@ D435i is currently supported with limitations.
 - src/gstrealsenseplugin.cpp:86:// TODO update formats
 - src/gstrealsenseplugin.cpp:210:    // TODO properties
 - src/gstrealsenseplugin.cpp:258:  /* TODO: use allocator or use from pool if that's more efficient or safer*/
-- src/gstrealsenseplugin.cpp:262:  // TODO: update log
 - src/gstrealsenseplugin.cpp:271:  // TODO refactor this section into cleaner code
 - src/gstrealsenseplugin.cpp:276:      /* TODO: use orc_memcpy */
 - src/gstrealsenseplugin.cpp:303:      /* TODO: use orc_memcpy */
-- src/gstrealsenseplugin.cpp:347:    /* TODO: set timestamps */
 - set plugin defines specific to WKD.SMRT/RealSense
 - Maybe add capability to generate synthetic data if no camera is connected.
     - Should be develop mode only
