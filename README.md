@@ -45,4 +45,3 @@ export GST_PLUGIN_PATH
 (gst-inspect-1.0:24981): GStreamer-WARNING **: 20:31:47.666: Element factory metadata for 'realsensesrc' has no valid klass field
 Could not load plugin file: File "mbuild/src/libgstrealsensesrc.so" appears to be a GStreamer plugin, but it failed to initialize
 ```
-- serial number property segfaults. need to figure out how to pass a string property. Alternatively could pass as uint.
