@@ -72,12 +72,27 @@ typedef struct _GstRealsenseSrc      GstRealsenseSrc;
 typedef struct _GstRealsenseSrcClass GstRealsenseSrcClass;
 
 using rs_pipe_ptr = std::unique_ptr<rs2::pipeline>;
+using rs_aligner_ptr = std::unique_ptr<rs2::align>;
+constexpr const auto DEFAULT_PROP_CAM_SN = 0;
+
+enum Align
+{
+  None,
+  Color,
+  Depth
+};
+
+enum StreamType
+{
+  StreamColor,
+  StreamDepth,
+  StreamMux // Color and depth crammed into the same buffer
+};
 
 struct _GstRealsenseSrc
 {
   GstPushSrc element;
 
-  // GstPad *srcpad;
   GstVideoInfo info; /* protected by the object or stream lock */
 
   gboolean silent;
@@ -88,6 +103,12 @@ struct _GstRealsenseSrc
   
   // Realsense vars
   rs_pipe_ptr rs_pipeline = nullptr;
+  rs_aligner_ptr aligner = nullptr;
+
+  // Properties
+  Align align = Align::None;
+  guint64 serial_number = 0;
+  StreamType stream_type = StreamType::StreamDepth;
 };
 
 struct _GstRealsenseSrcClass 
