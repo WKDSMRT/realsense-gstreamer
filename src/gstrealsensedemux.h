@@ -61,21 +61,28 @@ struct _GstRSDemux {
 //   dv_decoder_t  *decoder;
 
 //   GstAdapter    *adapter;
-  gint           frame_len;
+// GstAdapter adapts streams of varying input sizes to constant frame size.
+// We shouldn't need it
+// https://developer.gnome.org/gstreamer-libs/stable/GstAdapter.html
 
   /* video params */
+  gint           in_height;
+  gint           in_width;
+  gint           in_stride_bytes;
+
+  gint           color_height;
+  gint           color_width;
+  gint           color_stride_bytes;
+
+  gint           depth_height;
+  gint           depth_width;
+  gint           depth_stride_bytes;
+
+// TODO What do these values do? Are they needed?
+  gint           frame_len;
   gint           framerate_numerator;
   gint           framerate_denominator;
-  gint           height;
-  gboolean       wide;
-  /* audio params */
-  gint           frequency;
-  gint           channels;
-
   gboolean       discont;
-  gint64         frame_offset;
-  gint64         audio_offset;
-  gint64         video_offset;
 
   GstDVDemuxSeekHandler seek_handler;
   GstSegment     byte_segment;

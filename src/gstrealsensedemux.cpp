@@ -29,10 +29,10 @@
 // #include "gstsmptetimecode.h"
 
 /**
- * SECTION:element-dvdemux
- * @title: dvdemux
+ * SECTION:element-rsdemux
+ * @title: rsdemux
  *
- * dvdemux splits raw DV into its audio and video components. The audio will be
+ * rsdemux splits raw DV into its audio and video components. The audio will be
  * decoded raw samples and the video will be encoded DV video.
  *
  * This element can operate in both push and pull mode depending on the
@@ -40,7 +40,7 @@
  *
  * ## Example launch line
  * |[
- * gst-launch-1.0 filesrc location=test.dv ! dvdemux name=demux ! queue ! audioconvert ! alsasink demux. ! queue ! dvdec ! xvimagesink
+ * gst-launch-1.0 filesrc location=test.dv ! rsdemux name=demux ! queue ! audioconvert ! alsasink demux. ! queue ! dvdec ! xvimagesink
  * ]| This pipeline decodes and renders the raw DV stream to an audio and a videosink.
  *
  */
@@ -114,7 +114,7 @@ GST_DEBUG_CATEGORY_STATIC (rsdemux_debug);
   "framerate = " GST_VIDEO_FPS_RANGE ", "                              \
   "multiview-mode = { mono, left, right }"
 
-static GstStaticPadTemplate sink_temp = GST_STATIC_PAD_TEMPLATE ("sink",
+static GstStaticPadTemplate sink_tmpl = GST_STATIC_PAD_TEMPLATE ("sink",
     GST_PAD_SINK,
     GST_PAD_ALWAYS,
     GST_STATIC_CAPS (GST_VIDEO_CAPS_MAKE
@@ -173,7 +173,7 @@ static gboolean gst_rsdemux_handle_sink_event (GstPad * pad, GstObject * parent,
 
 /* scheduling functions */
 static void gst_rsdemux_loop (GstPad * pad);
-static GstFlowReturn gst_rsdemux_flush (GstRSDemux * dvdemux);
+static GstFlowReturn gst_rsdemux_flush (GstRSDemux * rsdemux);
 static GstFlowReturn gst_rsdemux_chain (GstPad * pad, GstObject * parent,
     GstBuffer * buffer);
 
@@ -199,9 +199,9 @@ gst_rsdemux_class_init (GstRSDemuxClass * klass)
   gstelement_class->change_state = GST_DEBUG_FUNCPTR (gst_rsdemux_change_state);
   gstelement_class->send_event = GST_DEBUG_FUNCPTR (gst_rsdemux_send_event);
 
-  gst_element_class_add_static_pad_template (gstelement_class, &sink_temp);
+  gst_element_class_add_static_pad_template (gstelement_class, &sink_tmpl);
   gst_element_class_add_static_pad_template (gstelement_class, &color_src_tmpl);
-//   gst_element_class_add_static_pad_template (gstelement_class, &audio_src_temp);
+  gst_element_class_add_static_pad_template (gstelement_class, &depth_src_tmpl);
 
   gst_element_class_set_static_metadata (gstelement_class,
       "RealSense Source Demuxer", "FIXME:Demuxer",
@@ -212,37 +212,32 @@ gst_rsdemux_class_init (GstRSDemuxClass * klass)
 }
 
 static void
-gst_rsdemux_init (GstRSDemux * dvdemux)
+gst_rsdemux_init (GstRSDemux * rsdemux)
 {
   gint i;
 
-  dvdemux->sinkpad = gst_pad_new_from_static_template (&sink_temp, "sink");
+  rsdemux->sinkpad = gst_pad_new_from_static_template (&sink_tmpl, "sink");
   /* we can operate in pull and push mode so we install
    * a custom activate function */
-  gst_pad_set_activate_function (dvdemux->sinkpad,
-      GST_DEBUG_FUNCPTR (gst_rsdemux_sink_activate));
+  gst_pad_set_activate_function (rsdemux->sinkpad, GST_DEBUG_FUNCPTR (gst_rsdemux_sink_activate));
   /* the function to activate in push mode */
-  gst_pad_set_activatemode_function (dvdemux->sinkpad,
-      GST_DEBUG_FUNCPTR (gst_rsdemux_sink_activate_mode));
+  gst_pad_set_activatemode_function (rsdemux->sinkpad, GST_DEBUG_FUNCPTR (gst_rsdemux_sink_activate_mode));
   /* for push mode, this is the chain function */
-  gst_pad_set_chain_function (dvdemux->sinkpad,
-      GST_DEBUG_FUNCPTR (gst_rsdemux_chain));
+  gst_pad_set_chain_function (rsdemux->sinkpad, GST_DEBUG_FUNCPTR (gst_rsdemux_chain));
   /* handling events (in push mode only) */
-  gst_pad_set_event_function (dvdemux->sinkpad,
-      GST_DEBUG_FUNCPTR (gst_rsdemux_handle_sink_event));
+  gst_pad_set_event_function (rsdemux->sinkpad, GST_DEBUG_FUNCPTR (gst_rsdemux_handle_sink_event));
   /* query functions */
-  gst_pad_set_query_function (dvdemux->sinkpad,
-      GST_DEBUG_FUNCPTR (gst_rsdemux_sink_query));
+  gst_pad_set_query_function (rsdemux->sinkpad, GST_DEBUG_FUNCPTR (gst_rsdemux_sink_query));
 
   /* now add the pad */
-  gst_element_add_pad (GST_ELEMENT (dvdemux), dvdemux->sinkpad);
+  gst_element_add_pad (GST_ELEMENT (rsdemux), rsdemux->sinkpad);
 
-//   dvdemux->adapter = gst_adapter_new ();
+//   rsdemux->adapter = gst_adapter_new ();
 
   /* we need 4 temp buffers for audio decoding which are of a static
    * size and which we can allocate here */
 //   for (i = 0; i < 4; i++) {
-//     dvdemux->audio_buffers[i] =
+//     rsdemux->audio_buffers[i] =
 //         (gint16 *) g_malloc (DV_AUDIO_MAX_SAMPLES * sizeof (gint16));
 //   }
 }
@@ -250,16 +245,16 @@ gst_rsdemux_init (GstRSDemux * dvdemux)
 static void
 gst_rsdemux_finalize (GObject * object)
 {
-  GstRSDemux *dvdemux;
+  GstRSDemux *rsdemux;
   gint i;
 
-  dvdemux = GST_RSDEMUX (object);
+  rsdemux = GST_RSDEMUX (object);
 
-//   g_object_unref (dvdemux->adapter);
+//   g_object_unref (rsdemux->adapter);
 
   /* clean up temp audio buffers */
   for (i = 0; i < 4; i++) {
-    g_free (dvdemux->audio_buffers[i]);
+    g_free (rsdemux->audio_buffers[i]);
   }
 
   G_OBJECT_CLASS (parent_class)->finalize (object);
@@ -267,29 +262,33 @@ gst_rsdemux_finalize (GObject * object)
 
 /* reset to default values before starting streaming */
 static void
-gst_rsdemux_reset (GstRSDemux * dvdemux)
+gst_rsdemux_reset (GstRSDemux * rsdemux)
 {
-  dvdemux->frame_offset = 0;
-  dvdemux->audio_offset = 0;
-  dvdemux->video_offset = 0;
-  dvdemux->discont = TRUE;
-  g_atomic_int_set (&dvdemux->found_header, 0);
-  dvdemux->frame_len = -1;
-  dvdemux->need_segment = FALSE;
-  dvdemux->new_media = FALSE;
-  dvdemux->framerate_numerator = 0;
-  dvdemux->framerate_denominator = 0;
-  dvdemux->height = 0;
-  dvdemux->frequency = 0;
-  dvdemux->channels = 0;
-  dvdemux->wide = FALSE;
-  gst_segment_init (&dvdemux->byte_segment, GST_FORMAT_BYTES);
-  gst_segment_init (&dvdemux->time_segment, GST_FORMAT_TIME);
-  dvdemux->segment_seqnum = 0;
-  dvdemux->upstream_time_segment = FALSE;
-  dvdemux->have_group_id = FALSE;
-  dvdemux->group_id = G_MAXUINT;
-  dvdemux->tag_event = NULL;
+
+  rsdemux->in_height = 0;
+  rsdemux->in_width = 0;
+  rsdemux->in_stride_bytes = 0;
+  rsdemux->color_height = 0;
+  rsdemux->color_width = 0;
+  rsdemux->color_stride_bytes = 0;
+  rsdemux->depth_height = 0;
+  rsdemux->depth_width = 0;
+  rsdemux->depth_stride_bytes = 0;
+
+  rsdemux->discont = TRUE;
+  g_atomic_int_set (&rsdemux->found_header, 0);
+  rsdemux->frame_len = -1;
+  rsdemux->need_segment = FALSE;
+  rsdemux->new_media = FALSE;
+  rsdemux->framerate_numerator = 0;
+  rsdemux->framerate_denominator = 0;
+  gst_segment_init (&rsdemux->byte_segment, GST_FORMAT_BYTES);
+  gst_segment_init (&rsdemux->time_segment, GST_FORMAT_TIME);
+  rsdemux->segment_seqnum = 0;
+  rsdemux->upstream_time_segment = FALSE;
+  rsdemux->have_group_id = FALSE;
+  rsdemux->group_id = G_MAXUINT;
+  rsdemux->tag_event = NULL;
 }
 
 static gboolean
@@ -313,16 +312,16 @@ have_group_id (GstRSDemux * demux)
 }
 
 static GstEvent *
-gst_rsdemux_create_global_tag_event (GstRSDemux * dvdemux)
+gst_rsdemux_create_global_tag_event (GstRSDemux * rsdemux)
 {
   gchar rec_datetime[40];
   GstDateTime *rec_dt;
   GstTagList *tags;
 
-  tags = gst_tag_list_new (GST_TAG_CONTAINER_FORMAT, "DV", NULL);
+  tags = gst_tag_list_new (GST_TAG_CONTAINER_FORMAT, "RS", NULL);
   gst_tag_list_set_scope (tags, GST_TAG_SCOPE_GLOBAL);
 
-//   if (dv_get_recording_datetime (dvdemux->decoder, rec_datetime)) {
+//   if (dv_get_recording_datetime (rsdemux->decoder, rec_datetime)) {
 //     rec_dt = gst_date_time_new_from_iso8601_string (rec_datetime);
 //     if (rec_dt) {
 //       gst_tag_list_add (tags, GST_TAG_MERGE_REPLACE, GST_TAG_DATE_TIME,
@@ -334,8 +333,9 @@ gst_rsdemux_create_global_tag_event (GstRSDemux * dvdemux)
   return gst_event_new_tag (tags);
 }
 
-/*static GstPad *
-gst_rsdemux_add_pad (GstRSDemux * dvdemux, GstStaticPadTemplate * template,
+#if CUSTOM_ADD_PAD
+static GstPad *
+gst_rsdemux_add_pad (GstRSDemux * rsdemux, GstStaticPadTemplate * template,
     GstCaps * caps)
 {
   GstPad *pad;
@@ -353,48 +353,53 @@ gst_rsdemux_add_pad (GstRSDemux * dvdemux, GstStaticPadTemplate * template,
 
   stream_id =
       gst_pad_create_stream_id (pad,
-      GST_ELEMENT_CAST (dvdemux),
+      GST_ELEMENT_CAST (rsdemux),
       template == &video_src_temp ? "video" : "audio");
   event = gst_event_new_stream_start (stream_id);
-  if (have_group_id (dvdemux))
-    gst_event_set_group_id (event, dvdemux->group_id);
+  if (have_group_id (rsdemux))
+    gst_event_set_group_id (event, rsdemux->group_id);
   gst_pad_push_event (pad, event);
   g_free (stream_id);
 
 //   gst_pad_set_caps (pad, caps);
 
-  gst_pad_push_event (pad, gst_event_new_segment (&dvdemux->time_segment));
+  gst_pad_push_event (pad, gst_event_new_segment (&rsdemux->time_segment));
 
-  gst_element_add_pad (GST_ELEMENT (dvdemux), pad);
+  gst_element_add_pad (GST_ELEMENT (rsdemux), pad);
 
-  if (!dvdemux->tag_event) {
-    dvdemux->tag_event = gst_rsdemux_create_global_tag_event (dvdemux);
+  if (!rsdemux->tag_event) {
+    rsdemux->tag_event = gst_rsdemux_create_global_tag_event (rsdemux);
   }
 
-  if (dvdemux->tag_event) {
-    gst_pad_push_event (pad, gst_event_ref (dvdemux->tag_event));
+  if (rsdemux->tag_event) {
+    gst_pad_push_event (pad, gst_event_ref (rsdemux->tag_event));
   }
 
   return pad;
 }
-*/
+#endif
 static void
-gst_rsdemux_remove_pads (GstRSDemux * dvdemux)
+gst_rsdemux_remove_pads (GstRSDemux * rsdemux)
 {
-  if (dvdemux->colorsrcpad) {
-    gst_element_remove_pad (GST_ELEMENT (dvdemux), dvdemux->colorsrcpad);
-    dvdemux->colorsrcpad = NULL;
+  if (rsdemux->colorsrcpad) {
+    gst_element_remove_pad (GST_ELEMENT (rsdemux), rsdemux->colorsrcpad);
+    rsdemux->colorsrcpad = NULL;
   }
+  if (rsdemux->depthsrcpad) {
+    gst_element_remove_pad (GST_ELEMENT (rsdemux), rsdemux->depthsrcpad);
+    rsdemux->depthsrcpad = NULL;
+  }
+  
 #if AUDIO_SRC
-  if (dvdemux->audiosrcpad) {
-    gst_element_remove_pad (GST_ELEMENT (dvdemux), dvdemux->audiosrcpad);
-    dvdemux->audiosrcpad = NULL;
+  if (rsdemux->audiosrcpad) {
+    gst_element_remove_pad (GST_ELEMENT (rsdemux), rsdemux->audiosrcpad);
+    rsdemux->audiosrcpad = NULL;
   }
 #endif  
 }
 
 static gboolean
-gst_rsdemux_src_convert (GstRSDemux * dvdemux, GstPad * pad,
+gst_rsdemux_src_convert (GstRSDemux * rsdemux, GstPad * pad,
     GstFormat src_format, gint64 src_value, GstFormat dest_format,
     gint64 * dest_value)
 {
@@ -405,10 +410,10 @@ gst_rsdemux_src_convert (GstRSDemux * dvdemux, GstPad * pad,
     goto done;
   }
 
-  if (dvdemux->frame_len <= 0)
+  if (rsdemux->frame_len <= 0)
     goto error;
 
-//   if (dvdemux->decoder == NULL)
+//   if (rsdemux->decoder == NULL)
 //     goto error;
 
   GST_INFO_OBJECT (pad,
@@ -419,22 +424,22 @@ gst_rsdemux_src_convert (GstRSDemux * dvdemux, GstPad * pad,
     case GST_FORMAT_BYTES:
       switch (dest_format) {
         case GST_FORMAT_DEFAULT:
-          if (pad == dvdemux->colorsrcpad)
-            *dest_value = src_value / dvdemux->frame_len;
+          if (pad == rsdemux->colorsrcpad || pad == rsdemux->depthsrcpad)
+            *dest_value = src_value / rsdemux->frame_len;
 #if AUDIO_SRC
-          else if (pad == dvdemux->audiosrcpad)
-            *dest_value = src_value / (2 * dvdemux->channels);
+          else if (pad == rsdemux->audiosrcpad)
+            *dest_value = src_value / (2 * rsdemux->channels);
 #endif
           break;
         case GST_FORMAT_TIME:
-          if (pad == dvdemux->colorsrcpad)
+          if (pad == rsdemux->colorsrcpad || pad == rsdemux->depthsrcpad)
             *dest_value = gst_util_uint64_scale (src_value,
-                GST_SECOND * dvdemux->framerate_denominator,
-                dvdemux->frame_len * dvdemux->framerate_numerator);
+                GST_SECOND * rsdemux->framerate_denominator,
+                rsdemux->frame_len * rsdemux->framerate_numerator);
 #if AUDIO_SRC                
-          else if (pad == dvdemux->audiosrcpad)
+          else if (pad == rsdemux->audiosrcpad)
             *dest_value = gst_util_uint64_scale_int (src_value, GST_SECOND,
-                2 * dvdemux->frequency * dvdemux->channels);
+                2 * rsdemux->frequency * rsdemux->channels);
 #endif        
           break;
         default:
@@ -444,29 +449,29 @@ gst_rsdemux_src_convert (GstRSDemux * dvdemux, GstPad * pad,
     case GST_FORMAT_TIME:
       switch (dest_format) {
         case GST_FORMAT_BYTES:
-          if (pad == dvdemux->colorsrcpad)
+          if (pad == rsdemux->colorsrcpad || pad == rsdemux->depthsrcpad)
             *dest_value = gst_util_uint64_scale (src_value,
-                dvdemux->frame_len * dvdemux->framerate_numerator,
-                dvdemux->framerate_denominator * GST_SECOND);
+                rsdemux->frame_len * rsdemux->framerate_numerator,
+                rsdemux->framerate_denominator * GST_SECOND);
 #if AUDIO_SRC                
-          else if (pad == dvdemux->audiosrcpad)
+          else if (pad == rsdemux->audiosrcpad)
             *dest_value = gst_util_uint64_scale_int (src_value,
-                2 * dvdemux->frequency * dvdemux->channels, GST_SECOND);
+                2 * rsdemux->frequency * rsdemux->channels, GST_SECOND);
 #endif                
           break;
         case GST_FORMAT_DEFAULT:
-          if (pad == dvdemux->colorsrcpad) {
+          if (pad == rsdemux->colorsrcpad || pad == rsdemux->depthsrcpad) {
             if (src_value)
               *dest_value = gst_util_uint64_scale (src_value,
-                  dvdemux->framerate_numerator,
-                  dvdemux->framerate_denominator * GST_SECOND);
+                  rsdemux->framerate_numerator,
+                  rsdemux->framerate_denominator * GST_SECOND);
             else
               *dest_value = 0;
-          } 
+          }
 #if AUDIO_SRC
-          else if (pad == dvdemux->audiosrcpad) {
+          else if (pad == rsdemux->audiosrcpad) {
             *dest_value = gst_util_uint64_scale (src_value,
-                dvdemux->frequency, GST_SECOND);
+                rsdemux->frequency, GST_SECOND);
           }
 #endif          
           break;
@@ -477,28 +482,28 @@ gst_rsdemux_src_convert (GstRSDemux * dvdemux, GstPad * pad,
     case GST_FORMAT_DEFAULT:
       switch (dest_format) {
         case GST_FORMAT_TIME:
-          if (pad == dvdemux->colorsrcpad) {
+          if (pad == rsdemux->colorsrcpad || pad == rsdemux->depthsrcpad) {
             *dest_value = gst_util_uint64_scale (src_value,
-                GST_SECOND * dvdemux->framerate_denominator,
-                dvdemux->framerate_numerator);
+                GST_SECOND * rsdemux->framerate_denominator,
+                rsdemux->framerate_numerator);
           } 
 #if AUDIO_SRC
-          else if (pad == dvdemux->audiosrcpad) {
+          else if (pad == rsdemux->audiosrcpad) {
             if (src_value)
               *dest_value = gst_util_uint64_scale (src_value,
-                  GST_SECOND, dvdemux->frequency);
+                  GST_SECOND, rsdemux->frequency);
             else
               *dest_value = 0;
           }
 #endif
           break;
         case GST_FORMAT_BYTES:
-          if (pad == dvdemux->colorsrcpad) {
-            *dest_value = src_value * dvdemux->frame_len;
+          if (pad == rsdemux->colorsrcpad || pad == rsdemux->depthsrcpad) {
+            *dest_value = src_value * rsdemux->frame_len;
           } 
 #if AUDIO_SRC
-          else if (pad == dvdemux->audiosrcpad) {
-            *dest_value = src_value * 2 * dvdemux->channels;
+          else if (pad == rsdemux->audiosrcpad) {
+            *dest_value = src_value * 2 * rsdemux->channels;
           }
 #endif          
           break;
@@ -525,13 +530,13 @@ error:
 }
 
 static gboolean
-gst_rsdemux_sink_convert (GstRSDemux * dvdemux, GstFormat src_format,
+gst_rsdemux_sink_convert (GstRSDemux * rsdemux, GstFormat src_format,
     gint64 src_value, GstFormat dest_format, gint64 * dest_value)
 {
   gboolean res = TRUE;
 
-  GST_DEBUG_OBJECT (dvdemux, "%d -> %d", src_format, dest_format);
-  GST_INFO_OBJECT (dvdemux,
+  GST_DEBUG_OBJECT (rsdemux, "%d -> %d", src_format, dest_format);
+  GST_INFO_OBJECT (rsdemux,
       "src_value:%" G_GINT64_FORMAT ", src_format:%d, dest_format:%d",
       src_value, src_format, dest_format);
 
@@ -540,7 +545,7 @@ gst_rsdemux_sink_convert (GstRSDemux * dvdemux, GstFormat src_format,
     goto done;
   }
 
-  if (dvdemux->frame_len <= 0)
+  if (rsdemux->frame_len <= 0)
     goto error;
 
   switch (src_format) {
@@ -552,11 +557,11 @@ gst_rsdemux_sink_convert (GstRSDemux * dvdemux, GstFormat src_format,
 
           /* get frame number, rounds down so don't combine this
            * line and the next line. */
-          frame = src_value / dvdemux->frame_len;
+          frame = src_value / rsdemux->frame_len;
 
           *dest_value = gst_util_uint64_scale (frame,
-              GST_SECOND * dvdemux->framerate_denominator,
-              dvdemux->framerate_numerator);
+              GST_SECOND * rsdemux->framerate_denominator,
+              rsdemux->framerate_numerator);
           break;
         }
         default:
@@ -571,11 +576,11 @@ gst_rsdemux_sink_convert (GstRSDemux * dvdemux, GstFormat src_format,
 
           /* calculate the frame */
           frame =
-              gst_util_uint64_scale (src_value, dvdemux->framerate_numerator,
-              dvdemux->framerate_denominator * GST_SECOND);
+              gst_util_uint64_scale (src_value, rsdemux->framerate_numerator,
+              rsdemux->framerate_denominator * GST_SECOND);
 
           /* calculate the offset from the rounded frame */
-          *dest_value = frame * dvdemux->frame_len;
+          *dest_value = frame * rsdemux->frame_len;
           break;
         }
         default:
@@ -585,7 +590,7 @@ gst_rsdemux_sink_convert (GstRSDemux * dvdemux, GstFormat src_format,
     default:
       res = FALSE;
   }
-  GST_INFO_OBJECT (dvdemux,
+  GST_INFO_OBJECT (rsdemux,
       "Result : dest_format:%d, dest_value:%" G_GINT64_FORMAT ", res:%d",
       dest_format, *dest_value, res);
 
@@ -594,7 +599,7 @@ done:
 
 error:
   {
-    GST_INFO_OBJECT (dvdemux, "sink conversion failed");
+    GST_INFO_OBJECT (rsdemux, "sink conversion failed");
     return FALSE;
   }
 }
@@ -603,9 +608,7 @@ static gboolean
 gst_rsdemux_src_query (GstPad * pad, GstObject * parent, GstQuery * query)
 {
   gboolean res = TRUE;
-  GstRSDemux *dvdemux;
-
-  dvdemux = GST_RSDEMUX (parent);
+  GstRSDemux *rsdemux = GST_RSDEMUX (parent);
 
   switch (GST_QUERY_TYPE (query)) {
     case GST_QUERY_POSITION:
@@ -617,8 +620,8 @@ gst_rsdemux_src_query (GstPad * pad, GstObject * parent, GstQuery * query)
       gst_query_parse_position (query, &format, NULL);
 
       /* bring the position to the requested format. */
-      if (!(res = gst_rsdemux_src_convert (dvdemux, pad,
-                  GST_FORMAT_TIME, dvdemux->time_segment.position,
+      if (!(res = gst_rsdemux_src_convert (rsdemux, pad,
+                  GST_FORMAT_TIME, rsdemux->time_segment.position,
                   format, &cur)))
         goto error;
       gst_query_set_position (query, format, cur);
@@ -631,13 +634,13 @@ gst_rsdemux_src_query (GstPad * pad, GstObject * parent, GstQuery * query)
       GstQuery *pquery;
 
       /* First ask the peer in the original format */
-      if (!gst_pad_peer_query (dvdemux->sinkpad, query)) {
+      if (!gst_pad_peer_query (rsdemux->sinkpad, query)) {
         /* get target format */
         gst_query_parse_duration (query, &format, NULL);
 
         /* Now ask the peer in BYTES format and try to convert */
         pquery = gst_query_new_duration (GST_FORMAT_BYTES);
-        if (!gst_pad_peer_query (dvdemux->sinkpad, pquery)) {
+        if (!gst_pad_peer_query (rsdemux->sinkpad, pquery)) {
           gst_query_unref (pquery);
           goto error;
         }
@@ -648,7 +651,7 @@ gst_rsdemux_src_query (GstPad * pad, GstObject * parent, GstQuery * query)
 
         /* convert end to requested format */
         if (end != -1) {
-          if (!(res = gst_rsdemux_sink_convert (dvdemux,
+          if (!(res = gst_rsdemux_sink_convert (rsdemux,
                       GST_FORMAT_BYTES, end, format, &end))) {
             goto error;
           }
@@ -664,7 +667,7 @@ gst_rsdemux_src_query (GstPad * pad, GstObject * parent, GstQuery * query)
 
       gst_query_parse_convert (query, &src_fmt, &src_val, &dest_fmt, &dest_val);
       if (!(res =
-              gst_rsdemux_src_convert (dvdemux, pad, src_fmt, src_val,
+              gst_rsdemux_src_convert (rsdemux, pad, src_fmt, src_val,
                   dest_fmt, &dest_val)))
         goto error;
       gst_query_set_convert (query, src_fmt, src_val, dest_fmt, dest_val);
@@ -685,7 +688,7 @@ gst_rsdemux_src_query (GstPad * pad, GstObject * parent, GstQuery * query)
       }
 
       /* First ask upstream */
-      if (gst_pad_peer_query (dvdemux->sinkpad, query)) {
+      if (gst_pad_peer_query (rsdemux->sinkpad, query)) {
         gst_query_parse_seeking (query, NULL, &seekable, NULL, NULL);
         if (seekable) {
           res = TRUE;
@@ -696,7 +699,7 @@ gst_rsdemux_src_query (GstPad * pad, GstObject * parent, GstQuery * query)
       res = TRUE;
 
       peerquery = gst_query_new_seeking (GST_FORMAT_BYTES);
-      seekable = gst_pad_peer_query (dvdemux->sinkpad, peerquery);
+      seekable = gst_pad_peer_query (rsdemux->sinkpad, peerquery);
 
       if (seekable)
         gst_query_parse_seeking (peerquery, NULL, &seekable, NULL, NULL);
@@ -740,9 +743,9 @@ static gboolean
 gst_rsdemux_sink_query (GstPad * pad, GstObject * parent, GstQuery * query)
 {
   gboolean res = TRUE;
-  GstRSDemux *dvdemux;
+  GstRSDemux *rsdemux;
 
-  dvdemux = GST_RSDEMUX (parent);
+  rsdemux = GST_RSDEMUX (parent);
 
   switch (GST_QUERY_TYPE (query)) {
     case GST_QUERY_CONVERT:
@@ -752,7 +755,7 @@ gst_rsdemux_sink_query (GstPad * pad, GstObject * parent, GstQuery * query)
 
       gst_query_parse_convert (query, &src_fmt, &src_val, &dest_fmt, &dest_val);
       if (!(res =
-              gst_rsdemux_sink_convert (dvdemux, src_fmt, src_val, dest_fmt,
+              gst_rsdemux_sink_convert (rsdemux, src_fmt, src_val, dest_fmt,
                   &dest_val)))
         goto error;
       gst_query_set_convert (query, src_fmt, src_val, dest_fmt, dest_val);
@@ -775,17 +778,17 @@ error:
 
 /* takes ownership of the event */
 static gboolean
-gst_rsdemux_push_event (GstRSDemux * dvdemux, GstEvent * event)
+gst_rsdemux_push_event (GstRSDemux * rsdemux, GstEvent * event)
 {
   gboolean res = FALSE;
 
-  if (dvdemux->colorsrcpad) {
+  if (rsdemux->colorsrcpad) {
     gst_event_ref (event);
-    res |= gst_pad_push_event (dvdemux->colorsrcpad, event);
+    res |= gst_pad_push_event (rsdemux->colorsrcpad, event);
   }
 #if AUDIO_SRC
-  if (dvdemux->audiosrcpad)
-    res |= gst_pad_push_event (dvdemux->audiosrcpad, event);
+  if (rsdemux->audiosrcpad)
+    res |= gst_pad_push_event (rsdemux->audiosrcpad, event);
   else 
 #endif
   {
@@ -800,7 +803,7 @@ static gboolean
 gst_rsdemux_handle_sink_event (GstPad * pad, GstObject * parent,
     GstEvent * event)
 {
-  GstRSDemux *dvdemux = GST_RSDEMUX (parent);
+  GstRSDemux *rsdemux = GST_RSDEMUX (parent);
   gboolean res = TRUE;
 
   switch (GST_EVENT_TYPE (event)) {
@@ -808,15 +811,15 @@ gst_rsdemux_handle_sink_event (GstPad * pad, GstObject * parent,
       /* we are not blocking on anything exect the push() calls
        * to the peer which will be unblocked by forwarding the
        * event.*/
-      res = gst_rsdemux_push_event (dvdemux, event);
+      res = gst_rsdemux_push_event (rsdemux, event);
       break;
     case GST_EVENT_FLUSH_STOP:
-    //   gst_adapter_clear (dvdemux->adapter);
+    //   gst_adapter_clear (rsdemux->adapter);
       GST_DEBUG ("cleared adapter");
-      gst_segment_init (&dvdemux->byte_segment, GST_FORMAT_BYTES);
-      gst_segment_init (&dvdemux->time_segment, GST_FORMAT_TIME);
-      dvdemux->discont = TRUE;
-      res = gst_rsdemux_push_event (dvdemux, event);
+      gst_segment_init (&rsdemux->byte_segment, GST_FORMAT_BYTES);
+      gst_segment_init (&rsdemux->time_segment, GST_FORMAT_TIME);
+      rsdemux->discont = TRUE;
+      res = gst_rsdemux_push_event (rsdemux, event);
       break;
     case GST_EVENT_SEGMENT:
     {
@@ -825,19 +828,19 @@ gst_rsdemux_handle_sink_event (GstPad * pad, GstObject * parent,
       gst_event_parse_segment (event, &segment);
       switch (segment->format) {
         case GST_FORMAT_BYTES:
-          gst_segment_copy_into (segment, &dvdemux->byte_segment);
-          dvdemux->need_segment = TRUE;
-          dvdemux->segment_seqnum = gst_event_get_seqnum (event);
+          gst_segment_copy_into (segment, &rsdemux->byte_segment);
+          rsdemux->need_segment = TRUE;
+          rsdemux->segment_seqnum = gst_event_get_seqnum (event);
           gst_event_unref (event);
           break;
         case GST_FORMAT_TIME:
-          gst_segment_copy_into (segment, &dvdemux->time_segment);
+          gst_segment_copy_into (segment, &rsdemux->time_segment);
 
-          dvdemux->upstream_time_segment = TRUE;
-          dvdemux->segment_seqnum = gst_event_get_seqnum (event);
+          rsdemux->upstream_time_segment = TRUE;
+          rsdemux->segment_seqnum = gst_event_get_seqnum (event);
 
           /* and we can just forward this time event */
-          res = gst_rsdemux_push_event (dvdemux, event);
+          res = gst_rsdemux_push_event (rsdemux, event);
           break;
         default:
           gst_event_unref (event);
@@ -849,17 +852,17 @@ gst_rsdemux_handle_sink_event (GstPad * pad, GstObject * parent,
     }
     case GST_EVENT_EOS:
       /* flush any pending data, should be nothing left. */
-      gst_rsdemux_flush (dvdemux);
+      gst_rsdemux_flush (rsdemux);
       /* forward event */
-      res = gst_rsdemux_push_event (dvdemux, event);
+      res = gst_rsdemux_push_event (rsdemux, event);
       /* and clear the adapter */
-    //   gst_adapter_clear (dvdemux->adapter);
+    //   gst_adapter_clear (rsdemux->adapter);
       break;
     case GST_EVENT_CAPS:
       gst_event_unref (event);
       break;
     default:
-      res = gst_rsdemux_push_event (dvdemux, event);
+      res = gst_rsdemux_push_event (rsdemux, event);
       break;
   }
 
@@ -868,7 +871,7 @@ gst_rsdemux_handle_sink_event (GstPad * pad, GstObject * parent,
 
 /* convert a pair of values on the given srcpad */
 static gboolean
-gst_rsdemux_convert_src_pair (GstRSDemux * dvdemux, GstPad * pad,
+gst_rsdemux_convert_src_pair (GstRSDemux * rsdemux, GstPad * pad,
     GstFormat src_format, gint64 src_start, gint64 src_stop,
     GstFormat dst_format, gint64 * dst_start, gint64 * dst_stop)
 {
@@ -876,7 +879,7 @@ gst_rsdemux_convert_src_pair (GstRSDemux * dvdemux, GstPad * pad,
 
   GST_INFO ("starting conversion of start");
   /* bring the format to time on srcpad. */
-  if (!(res = gst_rsdemux_src_convert (dvdemux, pad,
+  if (!(res = gst_rsdemux_src_convert (rsdemux, pad,
               src_format, src_start, dst_format, dst_start))) {
     goto done;
   }
@@ -884,7 +887,7 @@ gst_rsdemux_convert_src_pair (GstRSDemux * dvdemux, GstPad * pad,
 
   GST_INFO ("starting conversion of stop");
   /* bring the format to time on srcpad. */
-  if (!(res = gst_rsdemux_src_convert (dvdemux, pad,
+  if (!(res = gst_rsdemux_src_convert (rsdemux, pad,
               src_format, src_stop, dst_format, dst_stop))) {
     /* could not convert seek format to time offset */
     goto done;
@@ -896,7 +899,7 @@ done:
 
 /* convert a pair of values on the sinkpad */
 static gboolean
-gst_rsdemux_convert_sink_pair (GstRSDemux * dvdemux,
+gst_rsdemux_convert_sink_pair (GstRSDemux * rsdemux,
     GstFormat src_format, gint64 src_start, gint64 src_stop,
     GstFormat dst_format, gint64 * dst_start, gint64 * dst_stop)
 {
@@ -904,7 +907,7 @@ gst_rsdemux_convert_sink_pair (GstRSDemux * dvdemux,
 
   GST_INFO ("starting conversion of start");
   /* bring the format to time on srcpad. */
-  if (!(res = gst_rsdemux_sink_convert (dvdemux,
+  if (!(res = gst_rsdemux_sink_convert (rsdemux,
               src_format, src_start, dst_format, dst_start))) {
     goto done;
   }
@@ -912,7 +915,7 @@ gst_rsdemux_convert_sink_pair (GstRSDemux * dvdemux,
 
   GST_INFO ("starting conversion of stop");
   /* bring the format to time on srcpad. */
-  if (!(res = gst_rsdemux_sink_convert (dvdemux,
+  if (!(res = gst_rsdemux_sink_convert (rsdemux,
               src_format, src_stop, dst_format, dst_stop))) {
     /* could not convert seek format to time offset */
     goto done;
@@ -926,7 +929,7 @@ done:
  * values on the sinkpad 
  */
 static gboolean
-gst_rsdemux_convert_src_to_sink (GstRSDemux * dvdemux, GstPad * pad,
+gst_rsdemux_convert_src_to_sink (GstRSDemux * rsdemux, GstPad * pad,
     GstFormat src_format, gint64 src_start, gint64 src_stop,
     GstFormat dst_format, gint64 * dst_start, gint64 * dst_stop)
 {
@@ -935,13 +938,13 @@ gst_rsdemux_convert_src_to_sink (GstRSDemux * dvdemux, GstPad * pad,
 
   conv = GST_FORMAT_TIME;
   /* convert to TIME intermediate format */
-  if (!(res = gst_rsdemux_convert_src_pair (dvdemux, pad,
+  if (!(res = gst_rsdemux_convert_src_pair (rsdemux, pad,
               src_format, src_start, src_stop, conv, dst_start, dst_stop))) {
     /* could not convert format to time offset */
     goto done;
   }
   /* convert to dst format on sinkpad */
-  if (!(res = gst_rsdemux_convert_sink_pair (dvdemux,
+  if (!(res = gst_rsdemux_convert_sink_pair (rsdemux,
               conv, *dst_start, *dst_stop, dst_format, dst_start, dst_stop))) {
     /* could not convert format to time offset */
     goto done;
@@ -952,7 +955,7 @@ done:
 
 #if 0
 static gboolean
-gst_rsdemux_convert_segment (GstDVDemux * dvdemux, GstSegment * src,
+gst_rsdemux_convert_segment (Gstrsdemux * rsdemux, GstSegment * src,
     GstSegment * dest)
 {
   dest->rate = src->rate;
@@ -970,7 +973,7 @@ gst_rsdemux_convert_segment (GstDVDemux * dvdemux, GstSegment * src,
  * Does not take ownership of the event.
  */
 static gboolean
-gst_rsdemux_handle_push_seek (GstRSDemux * dvdemux, GstPad * pad,
+gst_rsdemux_handle_push_seek (GstRSDemux * rsdemux, GstPad * pad,
     GstEvent * event)
 {
   gboolean res = FALSE;
@@ -987,12 +990,12 @@ gst_rsdemux_handle_push_seek (GstRSDemux * dvdemux, GstPad * pad,
 
   /* First try if upstream can handle time based seeks */
   if (format == GST_FORMAT_TIME)
-    res = gst_pad_push_event (dvdemux->sinkpad, gst_event_ref (event));
+    res = gst_pad_push_event (rsdemux->sinkpad, gst_event_ref (event));
 
   if (!res) {
     /* we convert the start/stop on the srcpad to the byte format
      * on the sinkpad and forward the event */
-    res = gst_rsdemux_convert_src_to_sink (dvdemux, pad,
+    res = gst_rsdemux_convert_src_to_sink (rsdemux, pad,
         format, cur, stop, GST_FORMAT_BYTES, &start_position, &end_position);
     if (!res)
       goto done;
@@ -1002,30 +1005,31 @@ gst_rsdemux_handle_push_seek (GstRSDemux * dvdemux, GstPad * pad,
         cur_type, start_position, stop_type, end_position);
     gst_event_set_seqnum (newevent, gst_event_get_seqnum (event));
 
-    res = gst_pad_push_event (dvdemux->sinkpad, newevent);
+    res = gst_pad_push_event (rsdemux->sinkpad, newevent);
   }
 done:
   return res;
 }
 
+#if PROBABLY_UNUSED
 static void
-gst_rsdemux_update_frame_offsets (GstRSDemux * dvdemux, GstClockTime timestamp)
+gst_rsdemux_update_frame_offsets (GstRSDemux * rsdemux, GstClockTime timestamp)
 {
   /* calculate current frame number */
-  gst_rsdemux_src_convert (dvdemux, dvdemux->colorsrcpad,
-      dvdemux->time_segment.format, timestamp,
-      GST_FORMAT_DEFAULT, &dvdemux->video_offset);
+  gst_rsdemux_src_convert (rsdemux, rsdemux->colorsrcpad,
+      rsdemux->time_segment.format, timestamp,
+      GST_FORMAT_DEFAULT, &rsdemux->video_offset);
 
 #if AUDIO_SRC
   /* calculate current audio number */
-  gst_rsdemux_src_convert (dvdemux, dvdemux->audiosrcpad,
-      dvdemux->time_segment.format, timestamp,
-      GST_FORMAT_DEFAULT, &dvdemux->audio_offset);
+  gst_rsdemux_src_convert (rsdemux, rsdemux->audiosrcpad,
+      rsdemux->time_segment.format, timestamp,
+      GST_FORMAT_DEFAULT, &rsdemux->audio_offset);
 #endif
   /* every DV frame corresponts with one video frame */
-  dvdemux->frame_offset = dvdemux->video_offset;
+  rsdemux->frame_offset = rsdemux->video_offset;
 }
-
+#endif
 /* position ourselves to the configured segment, used in pull mode.
  * The input segment is in TIME format. We convert the time values
  * to bytes values into our byte_segment which we use to pull data from
@@ -1061,9 +1065,9 @@ gst_rsdemux_do_seek (GstRSDemux * demux, GstSegment * segment)
   gst_rsdemux_sink_convert (demux,
       segment->format, segment->time, format,
       (gint64 *) & demux->byte_segment.time);
-
+#if PROBABLY_UNUSED
   gst_rsdemux_update_frame_offsets (demux, segment->start);
-
+#endif
   demux->discont = TRUE;
 
 done:
@@ -1212,31 +1216,31 @@ no_format:
 static gboolean
 gst_rsdemux_send_event (GstElement * element, GstEvent * event)
 {
-  GstRSDemux *dvdemux = GST_RSDEMUX (element);
+  GstRSDemux *rsdemux = GST_RSDEMUX (element);
   gboolean res = FALSE;
 
   switch (GST_EVENT_TYPE (event)) {
     case GST_EVENT_SEEK:
     {
       /* checking header and configuring the seek must be atomic */
-      GST_OBJECT_LOCK (dvdemux);
-      if (g_atomic_int_get (&dvdemux->found_header) == 0) {
+      GST_OBJECT_LOCK (rsdemux);
+      if (g_atomic_int_get (&rsdemux->found_header) == 0) {
         GstEvent **event_p;
 
-        event_p = &dvdemux->seek_event;
+        event_p = &rsdemux->seek_event;
 
         /* We don't have pads yet. Keep the event. */
-        GST_INFO_OBJECT (dvdemux, "Keeping the seek event for later");
+        GST_INFO_OBJECT (rsdemux, "Keeping the seek event for later");
 
         gst_event_replace (event_p, event);
-        GST_OBJECT_UNLOCK (dvdemux);
+        GST_OBJECT_UNLOCK (rsdemux);
 
         res = TRUE;
       } else {
-        GST_OBJECT_UNLOCK (dvdemux);
+        GST_OBJECT_UNLOCK (rsdemux);
 
-        if (dvdemux->seek_handler)
-          res = dvdemux->seek_handler (dvdemux, dvdemux->colorsrcpad, event);
+        if (rsdemux->seek_handler)
+          res = rsdemux->seek_handler (rsdemux, rsdemux->colorsrcpad, event);
         gst_event_unref (event);
       }
       break;
@@ -1255,19 +1259,19 @@ gst_rsdemux_handle_src_event (GstPad * pad, GstObject * parent,
     GstEvent * event)
 {
   gboolean res = FALSE;
-  GstRSDemux *dvdemux;
+  GstRSDemux *rsdemux;
 
-  dvdemux = GST_RSDEMUX (parent);
+  rsdemux = GST_RSDEMUX (parent);
 
   switch (GST_EVENT_TYPE (event)) {
     case GST_EVENT_SEEK:
       /* seek handler is installed based on scheduling mode */
-      if (dvdemux->seek_handler)
-        res = dvdemux->seek_handler (dvdemux, pad, event);
+      if (rsdemux->seek_handler)
+        res = rsdemux->seek_handler (rsdemux, pad, event);
       gst_event_unref (event);
       break;
     default:
-      res = gst_pad_push_event (dvdemux->sinkpad, event);
+      res = gst_pad_push_event (rsdemux->sinkpad, event);
       break;
   }
 
@@ -1276,7 +1280,7 @@ gst_rsdemux_handle_src_event (GstPad * pad, GstObject * parent,
 
 /* does not take ownership of buffer */
 static GstFlowReturn
-gst_rsdemux_demux_audio (GstRSDemux * dvdemux, GstBuffer * buffer,
+gst_rsdemux_demux_audio (GstRSDemux * rsdemux, GstBuffer * buffer,
     guint64 duration)
 {
   gint num_samples;
@@ -1284,70 +1288,70 @@ gst_rsdemux_demux_audio (GstRSDemux * dvdemux, GstBuffer * buffer,
   GstMapInfo map;
 
   gst_buffer_map (buffer, &map, GST_MAP_READ);
-//   dv_decode_full_audio (dvdemux->decoder, map.data, dvdemux->audio_buffers);
+//   dv_decode_full_audio (rsdemux->decoder, map.data, rsdemux->audio_buffers);
   gst_buffer_unmap (buffer, &map);
 /*
-  if (G_LIKELY ((num_samples = dv_get_num_samples (dvdemux->decoder)) > 0)) {
+  if (G_LIKELY ((num_samples = dv_get_num_samples (rsdemux->decoder)) > 0)) {
     gint16 *a_ptr;
     gint i, j;
     GstBuffer *outbuf;
     gint frequency, channels;
 
     // get initial format or check if format changed 
-    frequency = dv_get_frequency (dvdemux->decoder);
-    channels = dv_get_num_channels (dvdemux->decoder);
+    frequency = dv_get_frequency (rsdemux->decoder);
+    channels = dv_get_num_channels (rsdemux->decoder);
 
-    if (G_UNLIKELY ((dvdemux->audiosrcpad == NULL)
-            || (frequency != dvdemux->frequency)
-            || (channels != dvdemux->channels))) {
+    if (G_UNLIKELY ((rsdemux->audiosrcpad == NULL)
+            || (frequency != rsdemux->frequency)
+            || (channels != rsdemux->channels))) {
       GstCaps *caps;
       GstAudioInfo info;
 
-      dvdemux->frequency = frequency;
-      dvdemux->channels = channels;
+      rsdemux->frequency = frequency;
+      rsdemux->channels = channels;
 
       gst_audio_info_init (&info);
       gst_audio_info_set_format (&info, GST_AUDIO_FORMAT_S16LE,
           frequency, channels, NULL);
       caps = gst_audio_info_to_caps (&info);
-      if (G_UNLIKELY (dvdemux->audiosrcpad == NULL)) {
-        dvdemux->audiosrcpad =
-            gst_rsdemux_add_pad (dvdemux, &audio_src_temp, caps);
+      if (G_UNLIKELY (rsdemux->audiosrcpad == NULL)) {
+        rsdemux->audiosrcpad =
+            gst_rsdemux_add_pad (rsdemux, &audio_src_temp, caps);
 
-        if (dvdemux->colorsrcpad && dvdemux->audiosrcpad)
-          gst_element_no_more_pads (GST_ELEMENT (dvdemux));
+        if (rsdemux->colorsrcpad && rsdemux->audiosrcpad)
+          gst_element_no_more_pads (GST_ELEMENT (rsdemux));
 
       } else {
-        gst_pad_set_caps (dvdemux->audiosrcpad, caps);
+        gst_pad_set_caps (rsdemux->audiosrcpad, caps);
       }
       gst_caps_unref (caps);
     }
 
     outbuf = gst_buffer_new_and_alloc (num_samples *
-        sizeof (gint16) * dvdemux->channels);
+        sizeof (gint16) * rsdemux->channels);
 
     gst_buffer_map (outbuf, &map, GST_MAP_WRITE);
     a_ptr = (gint16 *) map.data;
 
     for (i = 0; i < num_samples; i++) {
-      for (j = 0; j < dvdemux->channels; j++) {
-        *(a_ptr++) = dvdemux->audio_buffers[j][i];
+      for (j = 0; j < rsdemux->channels; j++) {
+        *(a_ptr++) = rsdemux->audio_buffers[j][i];
       }
     }
     gst_buffer_unmap (outbuf, &map);
 
     GST_DEBUG ("pushing audio %" GST_TIME_FORMAT,
-        GST_TIME_ARGS (dvdemux->time_segment.position));
+        GST_TIME_ARGS (rsdemux->time_segment.position));
 
-    GST_BUFFER_TIMESTAMP (outbuf) = dvdemux->time_segment.position;
+    GST_BUFFER_TIMESTAMP (outbuf) = rsdemux->time_segment.position;
     GST_BUFFER_DURATION (outbuf) = duration;
-    GST_BUFFER_OFFSET (outbuf) = dvdemux->audio_offset;
-    dvdemux->audio_offset += num_samples;
-    GST_BUFFER_OFFSET_END (outbuf) = dvdemux->audio_offset;
+    GST_BUFFER_OFFSET (outbuf) = rsdemux->audio_offset;
+    rsdemux->audio_offset += num_samples;
+    GST_BUFFER_OFFSET_END (outbuf) = rsdemux->audio_offset;
 
-    if (dvdemux->new_media || dvdemux->discont)
+    if (rsdemux->new_media || rsdemux->discont)
       GST_BUFFER_FLAG_SET (outbuf, GST_BUFFER_FLAG_DISCONT);
-    ret = gst_pad_push (dvdemux->audiosrcpad, outbuf);
+    ret = gst_pad_push (rsdemux->audiosrcpad, outbuf);
   } else {
     // no samples *
     ret = GST_FLOW_OK;
@@ -1358,7 +1362,7 @@ gst_rsdemux_demux_audio (GstRSDemux * dvdemux, GstBuffer * buffer,
 
 /* takes ownership of buffer */
 static GstFlowReturn
-gst_rsdemux_demux_video (GstRSDemux * dvdemux, GstBuffer * buffer,
+gst_rsdemux_demux_video (GstRSDemux * rsdemux, GstBuffer * buffer,
     guint64 duration)
 {
   GstBuffer *outbuf;
@@ -1369,19 +1373,19 @@ gst_rsdemux_demux_video (GstRSDemux * dvdemux, GstBuffer * buffer,
   /* get params */
   /* framerate is already up-to-date */
   /*
-  height = dvdemux->decoder->height;
-  wide = dv_format_wide (dvdemux->decoder);
+  height = rsdemux->decoder->height;
+  wide = dv_format_wide (rsdemux->decoder);
 
   // see if anything changed 
-  if (G_UNLIKELY ((dvdemux->colorsrcpad == NULL) || (dvdemux->height != height)
-          || dvdemux->wide != wide)) {
+  if (G_UNLIKELY ((rsdemux->colorsrcpad == NULL) || (rsdemux->height != height)
+          || rsdemux->wide != wide)) {
     gint par_x, par_y;
     GstCaps *caps;
 
-    dvdemux->height = height;
-    dvdemux->wide = wide;
+    rsdemux->height = height;
+    rsdemux->wide = wide;
 
-    if (dvdemux->decoder->system == e_dv_system_625_50) {
+    if (rsdemux->decoder->system == e_dv_system_625_50) {
       if (wide) {
         par_x = PAL_WIDE_PAR_X;
         par_y = PAL_WIDE_PAR_Y;
@@ -1403,19 +1407,19 @@ gst_rsdemux_demux_video (GstRSDemux * dvdemux, GstBuffer * buffer,
         "systemstream", G_TYPE_BOOLEAN, FALSE,
         "width", G_TYPE_INT, 720,
         "height", G_TYPE_INT, height,
-        "framerate", GST_TYPE_FRACTION, dvdemux->framerate_numerator,
-        dvdemux->framerate_denominator,
+        "framerate", GST_TYPE_FRACTION, rsdemux->framerate_numerator,
+        rsdemux->framerate_denominator,
         "pixel-aspect-ratio", GST_TYPE_FRACTION, par_x, par_y, NULL);
 
-    if (G_UNLIKELY (dvdemux->colorsrcpad == NULL)) {
-      dvdemux->colorsrcpad =
-          gst_rsdemux_add_pad (dvdemux, &video_src_temp, caps);
+    if (G_UNLIKELY (rsdemux->colorsrcpad == NULL)) {
+      rsdemux->colorsrcpad =
+          gst_rsdemux_add_pad (rsdemux, &video_src_temp, caps);
 
-      if (dvdemux->colorsrcpad && dvdemux->audiosrcpad)
-        gst_element_no_more_pads (GST_ELEMENT (dvdemux));
+      if (rsdemux->colorsrcpad && rsdemux->audiosrcpad)
+        gst_element_no_more_pads (GST_ELEMENT (rsdemux));
 
     } else {
-      gst_pad_set_caps (dvdemux->colorsrcpad, caps);
+      gst_pad_set_caps (rsdemux->colorsrcpad, caps);
     }
     gst_caps_unref (caps);
   }
@@ -1424,21 +1428,23 @@ gst_rsdemux_demux_video (GstRSDemux * dvdemux, GstBuffer * buffer,
    * the metadata. */
   outbuf = gst_buffer_make_writable (buffer);
 
-  GST_BUFFER_TIMESTAMP (outbuf) = dvdemux->time_segment.position;
-  GST_BUFFER_OFFSET (outbuf) = dvdemux->video_offset;
-  GST_BUFFER_OFFSET_END (outbuf) = dvdemux->video_offset + 1;
+  GST_BUFFER_TIMESTAMP (outbuf) = rsdemux->time_segment.position;
+#if PROBABLY_UNUSED
+  GST_BUFFER_OFFSET (outbuf) = rsdemux->video_offset;
+  GST_BUFFER_OFFSET_END (outbuf) = rsdemux->video_offset + 1;
+#endif
   GST_BUFFER_DURATION (outbuf) = duration;
 
-  if (dvdemux->new_media || dvdemux->discont)
+  if (rsdemux->new_media || rsdemux->discont)
     GST_BUFFER_FLAG_SET (outbuf, GST_BUFFER_FLAG_DISCONT);
 
   GST_DEBUG ("pushing video %" GST_TIME_FORMAT,
-      GST_TIME_ARGS (dvdemux->time_segment.position));
+      GST_TIME_ARGS (rsdemux->time_segment.position));
 
-  ret = gst_pad_push (dvdemux->colorsrcpad, outbuf);
-
-  dvdemux->video_offset++;
-
+  ret = gst_pad_push (rsdemux->colorsrcpad, outbuf);
+#if PROBABLY_UNUSED
+  rsdemux->video_offset++;
+#endif
   return ret;
 }
 
@@ -1456,14 +1462,14 @@ get_ssyb_offset (int dif, int ssyb)
 }
 
 /*static gboolean
-gst_rsdemux_get_timecode (GstRSDemux * dvdemux, GstBuffer * buffer,
+gst_rsdemux_get_timecode (GstRSDemux * rsdemux, GstBuffer * buffer,
     GstSMPTETimeCode * timecode)
 {
   guint8 *data;
   GstMapInfo map;
   int offset;
   int dif;
-  int n_difs = dvdemux->decoder->num_dif_seqs;
+  int n_difs = rsdemux->decoder->num_dif_seqs;
 
   gst_buffer_map (buffer, &map, GST_MAP_READ);
   data = map.data;
@@ -1490,7 +1496,7 @@ gst_rsdemux_get_timecode (GstRSDemux * dvdemux, GstBuffer * buffer,
 }*/
 
 static gboolean
-gst_rsdemux_is_new_media (GstRSDemux * dvdemux, GstBuffer * buffer)
+gst_rsdemux_is_new_media (GstRSDemux * rsdemux, GstBuffer * buffer)
 {
   guint8 *data;
   GstMapInfo map;
@@ -1498,7 +1504,7 @@ gst_rsdemux_is_new_media (GstRSDemux * dvdemux, GstBuffer * buffer)
   int dif;
   int n_difs;
 
-//   n_difs = dvdemux->decoder->num_dif_seqs;
+//   n_difs = rsdemux->decoder->num_dif_seqs;
 
   gst_buffer_map (buffer, &map, GST_MAP_READ);
   data = map.data;
@@ -1522,7 +1528,7 @@ gst_rsdemux_is_new_media (GstRSDemux * dvdemux, GstBuffer * buffer)
 
 /* takes ownership of buffer */
 static GstFlowReturn
-gst_rsdemux_demux_frame (GstRSDemux * dvdemux, GstBuffer * buffer)
+gst_rsdemux_demux_frame (GstRSDemux * rsdemux, GstBuffer * buffer)
 {
   GstClockTime next_ts;
   GstFlowReturn aret, vret, ret;
@@ -1531,83 +1537,85 @@ gst_rsdemux_demux_frame (GstRSDemux * dvdemux, GstBuffer * buffer)
 //   GstSMPTETimeCode timecode;
   int frame_number;
 
-  if (dvdemux->need_segment) {
+  if (rsdemux->need_segment) {
     GstFormat format;
     GstEvent *event;
 
-    g_assert (!dvdemux->upstream_time_segment);
+    g_assert (!rsdemux->upstream_time_segment);
 
     /* convert to time and store as start/end_timestamp */
     format = GST_FORMAT_TIME;
-    if (!(gst_rsdemux_convert_sink_pair (dvdemux,
-                GST_FORMAT_BYTES, dvdemux->byte_segment.start,
-                dvdemux->byte_segment.stop, format,
-                (gint64 *) & dvdemux->time_segment.start,
-                (gint64 *) & dvdemux->time_segment.stop)))
+    if (!(gst_rsdemux_convert_sink_pair (rsdemux,
+                GST_FORMAT_BYTES, rsdemux->byte_segment.start,
+                rsdemux->byte_segment.stop, format,
+                (gint64 *) & rsdemux->time_segment.start,
+                (gint64 *) & rsdemux->time_segment.stop)))
       goto segment_error;
 
-    dvdemux->time_segment.time = dvdemux->time_segment.start;
-    dvdemux->time_segment.rate = dvdemux->byte_segment.rate;
+    rsdemux->time_segment.time = rsdemux->time_segment.start;
+    rsdemux->time_segment.rate = rsdemux->byte_segment.rate;
 
-    gst_rsdemux_sink_convert (dvdemux,
-        GST_FORMAT_BYTES, dvdemux->byte_segment.position,
-        GST_FORMAT_TIME, (gint64 *) & dvdemux->time_segment.position);
+    gst_rsdemux_sink_convert (rsdemux,
+        GST_FORMAT_BYTES, rsdemux->byte_segment.position,
+        GST_FORMAT_TIME, (gint64 *) & rsdemux->time_segment.position);
 
-    gst_rsdemux_update_frame_offsets (dvdemux, dvdemux->time_segment.position);
-
-    GST_DEBUG_OBJECT (dvdemux, "sending segment start: %" GST_TIME_FORMAT
+#if PROBABLY_UNUSED
+    gst_rsdemux_update_frame_offsets (rsdemux, rsdemux->time_segment.position);
+#endif
+    GST_DEBUG_OBJECT (rsdemux, "sending segment start: %" GST_TIME_FORMAT
         ", stop: %" GST_TIME_FORMAT ", time: %" GST_TIME_FORMAT,
-        GST_TIME_ARGS (dvdemux->time_segment.start),
-        GST_TIME_ARGS (dvdemux->time_segment.stop),
-        GST_TIME_ARGS (dvdemux->time_segment.start));
+        GST_TIME_ARGS (rsdemux->time_segment.start),
+        GST_TIME_ARGS (rsdemux->time_segment.stop),
+        GST_TIME_ARGS (rsdemux->time_segment.start));
 
-    event = gst_event_new_segment (&dvdemux->time_segment);
-    if (dvdemux->segment_seqnum)
-      gst_event_set_seqnum (event, dvdemux->segment_seqnum);
-    gst_rsdemux_push_event (dvdemux, event);
+    event = gst_event_new_segment (&rsdemux->time_segment);
+    if (rsdemux->segment_seqnum)
+      gst_event_set_seqnum (event, rsdemux->segment_seqnum);
+    gst_rsdemux_push_event (rsdemux, event);
 
-    dvdemux->need_segment = FALSE;
+    rsdemux->need_segment = FALSE;
   }
 
-//   gst_rsdemux_get_timecode (dvdemux, buffer, &timecode);
-//   gst_smpte_time_code_get_frame_number (
-//       (dvdemux->decoder->system == e_dv_system_625_50) ?
-//       GST_SMPTE_TIME_CODE_SYSTEM_25 : GST_SMPTE_TIME_CODE_SYSTEM_30,
-//       &frame_number, &timecode);
+#if PROBABLY_UNUSED
+  gst_rsdemux_get_timecode (rsdemux, buffer, &timecode);
+  gst_smpte_time_code_get_frame_number (
+      (rsdemux->decoder->system == e_dv_system_625_50) ?
+      GST_SMPTE_TIME_CODE_SYSTEM_25 : GST_SMPTE_TIME_CODE_SYSTEM_30,
+      &frame_number, &timecode);
 
-  if (dvdemux->time_segment.rate < 0) {
+  if (rsdemux->time_segment.rate < 0) {
     next_ts = gst_util_uint64_scale_int (
-        (dvdemux->frame_offset >
-            0 ? dvdemux->frame_offset - 1 : 0) * GST_SECOND,
-        dvdemux->framerate_denominator, dvdemux->framerate_numerator);
-    duration = dvdemux->time_segment.position - next_ts;
+        (rsdemux->frame_offset >
+            0 ? rsdemux->frame_offset - 1 : 0) * GST_SECOND,
+        rsdemux->framerate_denominator, rsdemux->framerate_numerator);
+    duration = rsdemux->time_segment.position - next_ts;
   } else {
     next_ts = gst_util_uint64_scale_int (
-        (dvdemux->frame_offset + 1) * GST_SECOND,
-        dvdemux->framerate_denominator, dvdemux->framerate_numerator);
-    duration = next_ts - dvdemux->time_segment.position;
+        (rsdemux->frame_offset + 1) * GST_SECOND,
+        rsdemux->framerate_denominator, rsdemux->framerate_numerator);
+    duration = next_ts - rsdemux->time_segment.position;
   }
-
+#endif
   gst_buffer_map (buffer, &map, GST_MAP_READ);
-//   dv_parse_packs (dvdemux->decoder, map.data);
+//   dv_parse_packs (rsdemux->decoder, map.data);
   gst_buffer_unmap (buffer, &map);
-  dvdemux->new_media = FALSE;
-  if (gst_rsdemux_is_new_media (dvdemux, buffer) &&
-      dvdemux->frames_since_new_media > 2) {
-    dvdemux->new_media = TRUE;
-    dvdemux->frames_since_new_media = 0;
+  rsdemux->new_media = FALSE;
+  if (gst_rsdemux_is_new_media (rsdemux, buffer) &&
+      rsdemux->frames_since_new_media > 2) {
+    rsdemux->new_media = TRUE;
+    rsdemux->frames_since_new_media = 0;
   }
-  dvdemux->frames_since_new_media++;
+  rsdemux->frames_since_new_media++;
 
   /* does not take ownership of buffer */
-  aret = ret = gst_rsdemux_demux_audio (dvdemux, buffer, duration);
+  aret = ret = gst_rsdemux_demux_audio (rsdemux, buffer, duration);
   if (G_UNLIKELY (ret != GST_FLOW_OK && ret != GST_FLOW_NOT_LINKED)) {
     gst_buffer_unref (buffer);
     goto done;
   }
 
   /* takes ownership of buffer */
-  vret = ret = gst_rsdemux_demux_video (dvdemux, buffer, duration);
+  vret = ret = gst_rsdemux_demux_video (rsdemux, buffer, duration);
   if (G_UNLIKELY (ret != GST_FLOW_OK && ret != GST_FLOW_NOT_LINKED))
     goto done;
 
@@ -1617,24 +1625,25 @@ gst_rsdemux_demux_frame (GstRSDemux * dvdemux, GstBuffer * buffer)
     goto done;
   }
 
-  dvdemux->discont = FALSE;
-  dvdemux->time_segment.position = next_ts;
+  rsdemux->discont = FALSE;
+  rsdemux->time_segment.position = next_ts;
 
-  if (dvdemux->time_segment.rate < 0) {
-    if (dvdemux->frame_offset > 0)
-      dvdemux->frame_offset--;
+#if PROBABLY_UNUSED
+  if (rsdemux->time_segment.rate < 0) {
+    if (rsdemux->frame_offset > 0)
+      rsdemux->frame_offset--;
     else
-      GST_WARNING_OBJECT (dvdemux,
+      GST_WARNING_OBJECT (rsdemux,
           "Got before frame offset 0 in reverse playback");
   } else {
-    dvdemux->frame_offset++;
+    rsdemux->frame_offset++;
   }
-
+#endif
   /* check for the end of the segment */
-  if ((dvdemux->time_segment.rate > 0 && dvdemux->time_segment.stop != -1
-          && next_ts > dvdemux->time_segment.stop)
-      || (dvdemux->time_segment.rate < 0
-          && dvdemux->time_segment.start > next_ts))
+  if ((rsdemux->time_segment.rate > 0 && rsdemux->time_segment.stop != -1
+          && next_ts > rsdemux->time_segment.stop)
+      || (rsdemux->time_segment.rate < 0
+          && rsdemux->time_segment.start > next_ts))
     ret = GST_FLOW_EOS;
   else
     ret = GST_FLOW_OK;
@@ -1653,46 +1662,46 @@ segment_error:
 
 /* flush any remaining data in the adapter, used in chain based scheduling mode */
 static GstFlowReturn
-gst_rsdemux_flush (GstRSDemux * dvdemux)
+gst_rsdemux_flush (GstRSDemux * rsdemux)
 {
   GstFlowReturn ret = GST_FLOW_OK;
 /*
-  while (gst_adapter_available (dvdemux->adapter) >= dvdemux->frame_len) {
+  while (gst_adapter_available (rsdemux->adapter) >= rsdemux->frame_len) {
     const guint8 *data;
     gint length;
 
     /* get the accumulated bytes 
-    data = gst_adapter_map (dvdemux->adapter, dvdemux->frame_len);
+    data = gst_adapter_map (rsdemux->adapter, rsdemux->frame_len);
 
     /* parse header to know the length and other params 
-    if (G_UNLIKELY (dv_parse_header (dvdemux->decoder, data) < 0)) {
-      gst_adapter_unmap (dvdemux->adapter);
+    if (G_UNLIKELY (dv_parse_header (rsdemux->decoder, data) < 0)) {
+      gst_adapter_unmap (rsdemux->adapter);
       goto parse_header_error;
     }
-    gst_adapter_unmap (dvdemux->adapter);
+    gst_adapter_unmap (rsdemux->adapter);
 
     /* after parsing the header we know the length of the data 
-    length = dvdemux->frame_len = dvdemux->decoder->frame_size;
-    if (dvdemux->decoder->system == e_dv_system_625_50) {
-      dvdemux->framerate_numerator = PAL_FRAMERATE_NUMERATOR;
-      dvdemux->framerate_denominator = PAL_FRAMERATE_DENOMINATOR;
+    length = rsdemux->frame_len = rsdemux->decoder->frame_size;
+    if (rsdemux->decoder->system == e_dv_system_625_50) {
+      rsdemux->framerate_numerator = PAL_FRAMERATE_NUMERATOR;
+      rsdemux->framerate_denominator = PAL_FRAMERATE_DENOMINATOR;
     } else {
-      dvdemux->framerate_numerator = NTSC_FRAMERATE_NUMERATOR;
-      dvdemux->framerate_denominator = NTSC_FRAMERATE_DENOMINATOR;
+      rsdemux->framerate_numerator = NTSC_FRAMERATE_NUMERATOR;
+      rsdemux->framerate_denominator = NTSC_FRAMERATE_DENOMINATOR;
     }
-    g_atomic_int_set (&dvdemux->found_header, 1);
+    g_atomic_int_set (&rsdemux->found_header, 1);
 
     /* let demux_video set the height, it needs to detect when things change so
      * it can reset caps 
 
     /* if we still have enough for a frame, start decoding 
-    if (G_LIKELY (gst_adapter_available (dvdemux->adapter) >= length)) {
+    if (G_LIKELY (gst_adapter_available (rsdemux->adapter) >= length)) {
       GstBuffer *buffer;
 
-      buffer = gst_adapter_take_buffer (dvdemux->adapter, length);
+      buffer = gst_adapter_take_buffer (rsdemux->adapter, length);
 
       /* and decode the buffer, takes ownership 
-      ret = gst_rsdemux_demux_frame (dvdemux, buffer);
+      ret = gst_rsdemux_demux_frame (rsdemux, buffer);
       if (G_UNLIKELY (ret != GST_FLOW_OK))
         goto done;
     }
@@ -1704,7 +1713,7 @@ done:
   /* ERRORS */
 parse_header_error:
   {
-    GST_ELEMENT_ERROR (dvdemux, STREAM, DECODE,
+    GST_ELEMENT_ERROR (rsdemux, STREAM, DECODE,
         (NULL), ("Error parsing DV header"));
     return GST_FLOW_ERROR;
   }
@@ -1717,53 +1726,54 @@ parse_header_error:
 static GstFlowReturn
 gst_rsdemux_chain (GstPad * pad, GstObject * parent, GstBuffer * buffer)
 {
-  GstRSDemux *dvdemux;
+  GstRSDemux *rsdemux;
   GstFlowReturn ret;
   GstClockTime timestamp;
 
-  dvdemux = GST_RSDEMUX (parent);
+  rsdemux = GST_RSDEMUX (parent);
 
   /* a discontinuity in the stream, we need to get rid of
    * accumulated data in the adapter and assume a new frame
    * starts after the discontinuity */
   if (G_UNLIKELY (GST_BUFFER_FLAG_IS_SET (buffer, GST_BUFFER_FLAG_DISCONT))) {
-    // gst_adapter_clear (dvdemux->adapter);
-    dvdemux->discont = TRUE;
+    // gst_adapter_clear (rsdemux->adapter);
+    rsdemux->discont = TRUE;
 
     /* Should recheck where we are */
-    if (!dvdemux->upstream_time_segment)
-      dvdemux->need_segment = TRUE;
+    if (!rsdemux->upstream_time_segment)
+      rsdemux->need_segment = TRUE;
   }
 
   /* a timestamp always should be respected */
   timestamp = GST_BUFFER_TIMESTAMP (buffer);
   if (GST_CLOCK_TIME_IS_VALID (timestamp)) {
-    dvdemux->time_segment.position = timestamp;
-
-    if (dvdemux->discont)
-      gst_rsdemux_update_frame_offsets (dvdemux,
-          dvdemux->time_segment.position);
-  } else if (dvdemux->upstream_time_segment && dvdemux->discont) {
+    rsdemux->time_segment.position = timestamp;
+#if PROBABLY_UNUSED
+    if (rsdemux->discont)
+      gst_rsdemux_update_frame_offsets (rsdemux,
+          rsdemux->time_segment.position);
+#endif
+  } else if (rsdemux->upstream_time_segment && rsdemux->discont) {
     /* This will probably fail later to provide correct
      * timestamps and/or durations but also should not happen */
-    GST_ERROR_OBJECT (dvdemux,
+    GST_ERROR_OBJECT (rsdemux,
         "Upstream provides TIME segment but no PTS after discont");
   }
 
-//   gst_adapter_push (dvdemux->adapter, buffer);
+//   gst_adapter_push (rsdemux->adapter, buffer);
 
   /* Apparently dv_parse_header can read from the body of the frame
    * too, so it needs more than header_size bytes. Wacky!
    */
-  if (G_UNLIKELY (dvdemux->frame_len == -1)) {
+  if (G_UNLIKELY (rsdemux->frame_len == -1)) {
     /* if we don't know the length of a frame, we assume it is
      * the NTSC_BUFFER length, as this is enough to figure out 
      * if this is PAL or NTSC */
-    dvdemux->frame_len = NTSC_BUFFER;
+    rsdemux->frame_len = NTSC_BUFFER;
   }
 
   /* and try to flush pending frames */
-  ret = gst_rsdemux_flush (dvdemux);
+  ret = gst_rsdemux_flush (rsdemux);
 
   return ret;
 }
@@ -1777,18 +1787,18 @@ static void
 gst_rsdemux_loop (GstPad * pad)
 {
   GstFlowReturn ret;
-  GstRSDemux *dvdemux;
+  GstRSDemux *rsdemux;
   GstBuffer *buffer = NULL;
   GstMapInfo map;
 
-  dvdemux = GST_RSDEMUX (gst_pad_get_parent (pad));
+  rsdemux = GST_RSDEMUX (gst_pad_get_parent (pad));
 
-  if (G_UNLIKELY (g_atomic_int_get (&dvdemux->found_header) == 0)) {
-    GST_DEBUG_OBJECT (dvdemux, "pulling first buffer");
+  if (G_UNLIKELY (g_atomic_int_get (&rsdemux->found_header) == 0)) {
+    GST_DEBUG_OBJECT (rsdemux, "pulling first buffer");
     /* pull in NTSC sized buffer to figure out the frame
      * length */
-    ret = gst_pad_pull_range (dvdemux->sinkpad,
-        dvdemux->byte_segment.position, NTSC_BUFFER, &buffer);
+    ret = gst_pad_pull_range (rsdemux->sinkpad,
+        rsdemux->byte_segment.position, NTSC_BUFFER, &buffer);
     if (G_UNLIKELY (ret != GST_FLOW_OK))
       goto pause;
 
@@ -1798,26 +1808,26 @@ gst_rsdemux_loop (GstPad * pad)
 
     gst_buffer_map (buffer, &map, GST_MAP_READ);
     /* parse header to know the length and other params */
-    // if (G_UNLIKELY (dv_parse_header (dvdemux->decoder, map.data) < 0)) {
+    // if (G_UNLIKELY (dv_parse_header (rsdemux->decoder, map.data) < 0)) {
     //   gst_buffer_unmap (buffer, &map);
     //   goto parse_header_error;
     // }
     gst_buffer_unmap (buffer, &map);
 
     /* after parsing the header we know the length of the data */
-    // dvdemux->frame_len = dvdemux->decoder->frame_size;
-    // if (dvdemux->decoder->system == e_dv_system_625_50) {
-    //   dvdemux->framerate_numerator = PAL_FRAMERATE_NUMERATOR;
-    //   dvdemux->framerate_denominator = PAL_FRAMERATE_DENOMINATOR;
+    // rsdemux->frame_len = rsdemux->decoder->frame_size;
+    // if (rsdemux->decoder->system == e_dv_system_625_50) {
+    //   rsdemux->framerate_numerator = PAL_FRAMERATE_NUMERATOR;
+    //   rsdemux->framerate_denominator = PAL_FRAMERATE_DENOMINATOR;
     // } else 
     {
-      dvdemux->framerate_numerator = NTSC_FRAMERATE_NUMERATOR;
-      dvdemux->framerate_denominator = NTSC_FRAMERATE_DENOMINATOR;
+      rsdemux->framerate_numerator = NTSC_FRAMERATE_NUMERATOR;
+      rsdemux->framerate_denominator = NTSC_FRAMERATE_DENOMINATOR;
     }
-    dvdemux->need_segment = TRUE;
+    rsdemux->need_segment = TRUE;
 
     /* see if we need to read a larger part */
-    if (dvdemux->frame_len != NTSC_BUFFER) {
+    if (rsdemux->frame_len != NTSC_BUFFER) {
       gst_buffer_unref (buffer);
       buffer = NULL;
     }
@@ -1826,20 +1836,20 @@ gst_rsdemux_loop (GstPad * pad)
       GstEvent *event;
 
       /* setting header and prrforming the seek must be atomic */
-      GST_OBJECT_LOCK (dvdemux);
+      GST_OBJECT_LOCK (rsdemux);
       /* got header now */
-      g_atomic_int_set (&dvdemux->found_header, 1);
+      g_atomic_int_set (&rsdemux->found_header, 1);
 
       /* now perform pending seek if any. */
-      event = dvdemux->seek_event;
+      event = rsdemux->seek_event;
       if (event)
         gst_event_ref (event);
-      GST_OBJECT_UNLOCK (dvdemux);
+      GST_OBJECT_UNLOCK (rsdemux);
 
       if (event) {
-        if (!gst_rsdemux_handle_pull_seek (dvdemux, dvdemux->colorsrcpad,
+        if (!gst_rsdemux_handle_pull_seek (rsdemux, rsdemux->colorsrcpad,
                 event)) {
-          GST_ELEMENT_WARNING (dvdemux, STREAM, DECODE, (NULL),
+          GST_ELEMENT_WARNING (rsdemux, STREAM, DECODE, (NULL),
               ("Error performing initial seek"));
         }
         gst_event_unref (event);
@@ -1853,38 +1863,38 @@ gst_rsdemux_loop (GstPad * pad)
     }
   }
 
-  if (G_UNLIKELY (dvdemux->pending_segment)) {
+  if (G_UNLIKELY (rsdemux->pending_segment)) {
 
     /* now send the newsegment */
-    GST_DEBUG_OBJECT (dvdemux, "Sending newsegment from");
+    GST_DEBUG_OBJECT (rsdemux, "Sending newsegment from");
 
-    gst_rsdemux_push_event (dvdemux, dvdemux->pending_segment);
-    dvdemux->pending_segment = NULL;
+    gst_rsdemux_push_event (rsdemux, rsdemux->pending_segment);
+    rsdemux->pending_segment = NULL;
   }
 
   if (G_LIKELY (buffer == NULL)) {
-    GST_DEBUG_OBJECT (dvdemux, "pulling buffer at offset %" G_GINT64_FORMAT,
-        dvdemux->byte_segment.position);
+    GST_DEBUG_OBJECT (rsdemux, "pulling buffer at offset %" G_GINT64_FORMAT,
+        rsdemux->byte_segment.position);
 
-    ret = gst_pad_pull_range (dvdemux->sinkpad,
-        dvdemux->byte_segment.position, dvdemux->frame_len, &buffer);
+    ret = gst_pad_pull_range (rsdemux->sinkpad,
+        rsdemux->byte_segment.position, rsdemux->frame_len, &buffer);
     if (ret != GST_FLOW_OK)
       goto pause;
 
     /* check buffer size, don't want to read small buffers */
-    if (gst_buffer_get_size (buffer) < dvdemux->frame_len)
+    if (gst_buffer_get_size (buffer) < rsdemux->frame_len)
       goto small_buffer;
   }
   /* and decode the buffer */
-  ret = gst_rsdemux_demux_frame (dvdemux, buffer);
+  ret = gst_rsdemux_demux_frame (rsdemux, buffer);
   if (G_UNLIKELY (ret != GST_FLOW_OK))
     goto pause;
 
   /* and position ourselves for the next buffer */
-  dvdemux->byte_segment.position += dvdemux->frame_len;
+  rsdemux->byte_segment.position += rsdemux->frame_len;
 
 done:
-  gst_object_unref (dvdemux);
+  gst_object_unref (rsdemux);
 
   return;
 
@@ -1893,73 +1903,73 @@ parse_header_error:
   {
     GstEvent *event;
 
-    GST_ELEMENT_ERROR (dvdemux, STREAM, DECODE,
+    GST_ELEMENT_ERROR (rsdemux, STREAM, DECODE,
         (NULL), ("Error parsing DV header"));
     gst_buffer_unref (buffer);
-    gst_pad_pause_task (dvdemux->sinkpad);
+    gst_pad_pause_task (rsdemux->sinkpad);
     event = gst_event_new_eos ();
-    if (dvdemux->segment_seqnum)
-      gst_event_set_seqnum (event, dvdemux->segment_seqnum);
-    gst_rsdemux_push_event (dvdemux, event);
+    if (rsdemux->segment_seqnum)
+      gst_event_set_seqnum (event, rsdemux->segment_seqnum);
+    gst_rsdemux_push_event (rsdemux, event);
     goto done;
   }
 small_buffer:
   {
     GstEvent *event;
 
-    GST_ELEMENT_ERROR (dvdemux, STREAM, DECODE,
+    GST_ELEMENT_ERROR (rsdemux, STREAM, DECODE,
         (NULL), ("Error reading buffer"));
     gst_buffer_unref (buffer);
-    gst_pad_pause_task (dvdemux->sinkpad);
+    gst_pad_pause_task (rsdemux->sinkpad);
     event = gst_event_new_eos ();
-    if (dvdemux->segment_seqnum)
-      gst_event_set_seqnum (event, dvdemux->segment_seqnum);
-    gst_rsdemux_push_event (dvdemux, event);
+    if (rsdemux->segment_seqnum)
+      gst_event_set_seqnum (event, rsdemux->segment_seqnum);
+    gst_rsdemux_push_event (rsdemux, event);
     goto done;
   }
 pause:
   {
-    GST_INFO_OBJECT (dvdemux, "pausing task, %s", gst_flow_get_name (ret));
-    gst_pad_pause_task (dvdemux->sinkpad);
+    GST_INFO_OBJECT (rsdemux, "pausing task, %s", gst_flow_get_name (ret));
+    gst_pad_pause_task (rsdemux->sinkpad);
     if (ret == GST_FLOW_EOS) {
-      GST_LOG_OBJECT (dvdemux, "got eos");
+      GST_LOG_OBJECT (rsdemux, "got eos");
       /* so align our position with the end of it, if there is one
        * this ensures a subsequent will arrive at correct base/acc time */
-      if (dvdemux->time_segment.rate > 0.0 &&
-          GST_CLOCK_TIME_IS_VALID (dvdemux->time_segment.stop))
-        dvdemux->time_segment.position = dvdemux->time_segment.stop;
-      else if (dvdemux->time_segment.rate < 0.0)
-        dvdemux->time_segment.position = dvdemux->time_segment.start;
+      if (rsdemux->time_segment.rate > 0.0 &&
+          GST_CLOCK_TIME_IS_VALID (rsdemux->time_segment.stop))
+        rsdemux->time_segment.position = rsdemux->time_segment.stop;
+      else if (rsdemux->time_segment.rate < 0.0)
+        rsdemux->time_segment.position = rsdemux->time_segment.start;
       /* perform EOS logic */
-      if (dvdemux->time_segment.flags & GST_SEEK_FLAG_SEGMENT) {
+      if (rsdemux->time_segment.flags & GST_SEEK_FLAG_SEGMENT) {
         GstMessage *message;
         GstEvent *event;
 
-        event = gst_event_new_segment_done (dvdemux->time_segment.format,
-            dvdemux->time_segment.position);
-        if (dvdemux->segment_seqnum)
-          gst_event_set_seqnum (event, dvdemux->segment_seqnum);
+        event = gst_event_new_segment_done (rsdemux->time_segment.format,
+            rsdemux->time_segment.position);
+        if (rsdemux->segment_seqnum)
+          gst_event_set_seqnum (event, rsdemux->segment_seqnum);
 
-        message = gst_message_new_segment_done (GST_OBJECT_CAST (dvdemux),
-            dvdemux->time_segment.format, dvdemux->time_segment.position);
-        if (dvdemux->segment_seqnum)
-          gst_message_set_seqnum (message, dvdemux->segment_seqnum);
+        message = gst_message_new_segment_done (GST_OBJECT_CAST (rsdemux),
+            rsdemux->time_segment.format, rsdemux->time_segment.position);
+        if (rsdemux->segment_seqnum)
+          gst_message_set_seqnum (message, rsdemux->segment_seqnum);
 
-        gst_element_post_message (GST_ELEMENT (dvdemux), message);
-        gst_rsdemux_push_event (dvdemux, event);
+        gst_element_post_message (GST_ELEMENT (rsdemux), message);
+        gst_rsdemux_push_event (rsdemux, event);
       } else {
         GstEvent *event = gst_event_new_eos ();
-        if (dvdemux->segment_seqnum)
-          gst_event_set_seqnum (event, dvdemux->segment_seqnum);
-        gst_rsdemux_push_event (dvdemux, event);
+        if (rsdemux->segment_seqnum)
+          gst_event_set_seqnum (event, rsdemux->segment_seqnum);
+        gst_rsdemux_push_event (rsdemux, event);
       }
     } else if (ret == GST_FLOW_NOT_LINKED || ret < GST_FLOW_EOS) {
       GstEvent *event = gst_event_new_eos ();
       /* for fatal errors or not-linked we post an error message */
-      GST_ELEMENT_FLOW_ERROR (dvdemux, ret);
-      if (dvdemux->segment_seqnum)
-        gst_event_set_seqnum (event, dvdemux->segment_seqnum);
-      gst_rsdemux_push_event (dvdemux, event);
+      GST_ELEMENT_FLOW_ERROR (rsdemux, ret);
+      if (rsdemux->segment_seqnum)
+        gst_event_set_seqnum (event, rsdemux->segment_seqnum);
+      gst_rsdemux_push_event (rsdemux, event);
     }
     goto done;
   }
@@ -2034,16 +2044,16 @@ activate_push:
 static GstStateChangeReturn
 gst_rsdemux_change_state (GstElement * element, GstStateChange transition)
 {
-  GstRSDemux *dvdemux = GST_RSDEMUX (element);
+  GstRSDemux *rsdemux = GST_RSDEMUX (element);
   GstStateChangeReturn ret;
 
   switch (transition) {
     case GST_STATE_CHANGE_NULL_TO_READY:
       break;
     case GST_STATE_CHANGE_READY_TO_PAUSED:
-    //   dvdemux->decoder = dv_decoder_new (0, FALSE, FALSE);
-    //   dv_set_error_log (dvdemux->decoder, NULL);
-      gst_rsdemux_reset (dvdemux);
+    //   rsdemux->decoder = dv_decoder_new (0, FALSE, FALSE);
+    //   dv_set_error_log (rsdemux->decoder, NULL);
+      gst_rsdemux_reset (rsdemux);
       break;
     case GST_STATE_CHANGE_PAUSED_TO_PLAYING:
       break;
@@ -2057,15 +2067,15 @@ gst_rsdemux_change_state (GstElement * element, GstStateChange transition)
     case GST_STATE_CHANGE_PLAYING_TO_PAUSED:
       break;
     /*case GST_STATE_CHANGE_PAUSED_TO_READY:
-      gst_adapter_clear (dvdemux->adapter);
-      dv_decoder_free (dvdemux->decoder);
-      dvdemux->decoder = NULL;
+      gst_adapter_clear (rsdemux->adapter);
+      dv_decoder_free (rsdemux->decoder);
+      rsdemux->decoder = NULL;
 
-      gst_rsdemux_remove_pads (dvdemux);
+      gst_rsdemux_remove_pads (rsdemux);
 
-      if (dvdemux->tag_event) {
-        gst_event_unref (dvdemux->tag_event);
-        dvdemux->tag_event = NULL;
+      if (rsdemux->tag_event) {
+        gst_event_unref (rsdemux->tag_event);
+        rsdemux->tag_event = NULL;
       }
 
       break;
@@ -2074,11 +2084,11 @@ gst_rsdemux_change_state (GstElement * element, GstStateChange transition)
     {
       GstEvent **event_p;
 
-      event_p = &dvdemux->seek_event;
+      event_p = &rsdemux->seek_event;
       gst_event_replace (event_p, NULL);
-      if (dvdemux->pending_segment)
-        gst_event_unref (dvdemux->pending_segment);
-      dvdemux->pending_segment = NULL;
+      if (rsdemux->pending_segment)
+        gst_event_unref (rsdemux->pending_segment);
+      rsdemux->pending_segment = NULL;
       break;
     }
     default:
