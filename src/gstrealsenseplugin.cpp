@@ -64,6 +64,7 @@
 #include <gst/video/video.h>
 
 #include "gstrealsenseplugin.h"
+#include "gstrealsensedemux.h"
 
 GST_DEBUG_CATEGORY_STATIC (gst_realsense_src_debug);
 #define GST_CAT_DEFAULT gst_realsense_src_debug
@@ -632,8 +633,15 @@ realsensesrc_init (GstPlugin * realsensesrc)
   GST_DEBUG_CATEGORY_INIT (gst_realsense_src_debug, "realsensesrc",
       0, "Template realsensesrc");
 
-  return gst_element_register (realsensesrc, "realsensesrc", GST_RANK_NONE,
-      GST_TYPE_REALSENSESRC);
+  if (!gst_element_register (realsensesrc, "dvdemux", GST_RANK_MARGINAL,
+      GST_TYPE_RSDEMUX))
+    return FALSE;
+
+  if(!gst_element_register (realsensesrc, "realsensesrc", GST_RANK_PRIMARY,
+      GST_TYPE_REALSENSESRC))
+    return FALSE;
+
+  return TRUE;
 }
 
 /* PACKAGE: this is usually set by autotools depending on some _INIT macro
