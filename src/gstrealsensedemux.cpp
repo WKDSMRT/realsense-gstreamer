@@ -174,6 +174,7 @@ static gboolean gst_rsdemux_handle_sink_event (GstPad * pad, GstObject * parent,
 /* scheduling functions */
 static void gst_rsdemux_loop (GstPad * pad);
 static GstFlowReturn gst_rsdemux_flush (GstRSDemux * rsdemux);
+static GstFlowReturn gst_rsdemux_flush_buffer (GstRSDemux * rsdemux, GstBuffer* buffer);
 static GstFlowReturn gst_rsdemux_chain (GstPad * pad, GstObject * parent,
     GstBuffer * buffer);
 
@@ -231,6 +232,7 @@ gst_rsdemux_init (GstRSDemux * rsdemux)
 
   /* now add the pad */
   gst_element_add_pad (GST_ELEMENT (rsdemux), rsdemux->sinkpad);
+  // src pads will be created in the chain function
 
 //   rsdemux->adapter = gst_adapter_new ();
 
@@ -278,14 +280,14 @@ gst_rsdemux_reset (GstRSDemux * rsdemux)
   rsdemux->discont = TRUE;
   g_atomic_int_set (&rsdemux->found_header, 0);
   rsdemux->frame_len = -1;
-  rsdemux->need_segment = FALSE;
+  // rsdemux->need_segment = FALSE;
   rsdemux->new_media = FALSE;
   rsdemux->framerate_numerator = 0;
   rsdemux->framerate_denominator = 0;
-  gst_segment_init (&rsdemux->byte_segment, GST_FORMAT_BYTES);
-  gst_segment_init (&rsdemux->time_segment, GST_FORMAT_TIME);
-  rsdemux->segment_seqnum = 0;
-  rsdemux->upstream_time_segment = FALSE;
+  // gst_segment_init (&rsdemux->byte_segment, GST_FORMAT_BYTES);
+  // gst_segment_init (&rsdemux->time_segment, GST_FORMAT_TIME);
+  // rsdemux->segment_seqnum = 0;
+  // rsdemux->upstream_time_segment = FALSE;
   rsdemux->have_group_id = FALSE;
   rsdemux->group_id = G_MAXUINT;
   rsdemux->tag_event = NULL;
@@ -333,16 +335,14 @@ gst_rsdemux_create_global_tag_event (GstRSDemux * rsdemux)
   return gst_event_new_tag (tags);
 }
 
-#if CUSTOM_ADD_PAD
 static GstPad *
-gst_rsdemux_add_pad (GstRSDemux * rsdemux, GstStaticPadTemplate * template,
-    GstCaps * caps)
+gst_rsdemux_add_pad (GstRSDemux * rsdemux, GstStaticPadTemplate * templ, GstCaps * caps)
 {
   GstPad *pad;
   GstEvent *event;
   gchar *stream_id;
 
-  pad = gst_pad_new_from_static_template (template, template->name_template);
+  pad = gst_pad_new_from_static_template (templ, templ->name_template);
 
   gst_pad_set_query_function (pad, GST_DEBUG_FUNCPTR (gst_rsdemux_src_query));
 
@@ -351,19 +351,18 @@ gst_rsdemux_add_pad (GstRSDemux * rsdemux, GstStaticPadTemplate * template,
   gst_pad_use_fixed_caps (pad);
   gst_pad_set_active (pad, TRUE);
 
-  stream_id =
-      gst_pad_create_stream_id (pad,
-      GST_ELEMENT_CAST (rsdemux),
-      template == &video_src_temp ? "video" : "audio");
+  stream_id = gst_pad_create_stream_id (pad,
+                GST_ELEMENT_CAST (rsdemux),
+                templ == &color_src_tmpl ? "color" : "depth");
   event = gst_event_new_stream_start (stream_id);
   if (have_group_id (rsdemux))
     gst_event_set_group_id (event, rsdemux->group_id);
   gst_pad_push_event (pad, event);
   g_free (stream_id);
 
-//   gst_pad_set_caps (pad, caps);
+  gst_pad_set_caps (pad, caps);
 
-  gst_pad_push_event (pad, gst_event_new_segment (&rsdemux->time_segment));
+  // gst_pad_push_event (pad, gst_event_new_segment (&rsdemux->time_segment));
 
   gst_element_add_pad (GST_ELEMENT (rsdemux), pad);
 
@@ -377,7 +376,7 @@ gst_rsdemux_add_pad (GstRSDemux * rsdemux, GstStaticPadTemplate * template,
 
   return pad;
 }
-#endif
+
 static void
 gst_rsdemux_remove_pads (GstRSDemux * rsdemux)
 {
@@ -611,22 +610,6 @@ gst_rsdemux_src_query (GstPad * pad, GstObject * parent, GstQuery * query)
   GstRSDemux *rsdemux = GST_RSDEMUX (parent);
 
   switch (GST_QUERY_TYPE (query)) {
-    case GST_QUERY_POSITION:
-    {
-      GstFormat format;
-      gint64 cur;
-
-      /* get target format */
-      gst_query_parse_position (query, &format, NULL);
-
-      /* bring the position to the requested format. */
-      if (!(res = gst_rsdemux_src_convert (rsdemux, pad,
-                  GST_FORMAT_TIME, rsdemux->time_segment.position,
-                  format, &cur)))
-        goto error;
-      gst_query_set_position (query, format, cur);
-      break;
-    }
     case GST_QUERY_DURATION:
     {
       GstFormat format;
@@ -816,40 +799,11 @@ gst_rsdemux_handle_sink_event (GstPad * pad, GstObject * parent,
     case GST_EVENT_FLUSH_STOP:
     //   gst_adapter_clear (rsdemux->adapter);
       GST_DEBUG ("cleared adapter");
-      gst_segment_init (&rsdemux->byte_segment, GST_FORMAT_BYTES);
-      gst_segment_init (&rsdemux->time_segment, GST_FORMAT_TIME);
+      // gst_segment_init (&rsdemux->byte_segment, GST_FORMAT_BYTES);
+      // gst_segment_init (&rsdemux->time_segment, GST_FORMAT_TIME);
       rsdemux->discont = TRUE;
       res = gst_rsdemux_push_event (rsdemux, event);
       break;
-    case GST_EVENT_SEGMENT:
-    {
-      const GstSegment *segment;
-
-      gst_event_parse_segment (event, &segment);
-      switch (segment->format) {
-        case GST_FORMAT_BYTES:
-          gst_segment_copy_into (segment, &rsdemux->byte_segment);
-          rsdemux->need_segment = TRUE;
-          rsdemux->segment_seqnum = gst_event_get_seqnum (event);
-          gst_event_unref (event);
-          break;
-        case GST_FORMAT_TIME:
-          gst_segment_copy_into (segment, &rsdemux->time_segment);
-
-          rsdemux->upstream_time_segment = TRUE;
-          rsdemux->segment_seqnum = gst_event_get_seqnum (event);
-
-          /* and we can just forward this time event */
-          res = gst_rsdemux_push_event (rsdemux, event);
-          break;
-        default:
-          gst_event_unref (event);
-          /* cannot accept this format */
-          res = FALSE;
-          break;
-      }
-      break;
-    }
     case GST_EVENT_EOS:
       /* flush any pending data, should be nothing left. */
       gst_rsdemux_flush (rsdemux);
@@ -1030,188 +984,6 @@ gst_rsdemux_update_frame_offsets (GstRSDemux * rsdemux, GstClockTime timestamp)
   rsdemux->frame_offset = rsdemux->video_offset;
 }
 #endif
-/* position ourselves to the configured segment, used in pull mode.
- * The input segment is in TIME format. We convert the time values
- * to bytes values into our byte_segment which we use to pull data from
- * the sinkpad peer.
- */
-static gboolean
-gst_rsdemux_do_seek (GstRSDemux * demux, GstSegment * segment)
-{
-  gboolean res;
-  GstFormat format;
-
-  /* position to value configured is last_stop, this will round down
-   * to the byte position where the frame containing the given 
-   * timestamp can be found. */
-  format = GST_FORMAT_BYTES;
-  res = gst_rsdemux_sink_convert (demux,
-      segment->format, segment->position,
-      format, (gint64 *) & demux->byte_segment.position);
-  if (!res)
-    goto done;
-
-  /* update byte segment start */
-  gst_rsdemux_sink_convert (demux,
-      segment->format, segment->start, format,
-      (gint64 *) & demux->byte_segment.start);
-
-  /* update byte segment stop */
-  gst_rsdemux_sink_convert (demux,
-      segment->format, segment->stop, format,
-      (gint64 *) & demux->byte_segment.stop);
-
-  /* update byte segment time */
-  gst_rsdemux_sink_convert (demux,
-      segment->format, segment->time, format,
-      (gint64 *) & demux->byte_segment.time);
-#if PROBABLY_UNUSED
-  gst_rsdemux_update_frame_offsets (demux, segment->start);
-#endif
-  demux->discont = TRUE;
-
-done:
-  return res;
-}
-
-/* handle seek in pull base mode.
- *
- * Does not take ownership of the event.
- */
-static gboolean
-gst_rsdemux_handle_pull_seek (GstRSDemux * demux, GstPad * pad,
-    GstEvent * event)
-{
-  gboolean res;
-  gdouble rate;
-  GstFormat format;
-  GstSeekFlags flags;
-  GstSeekType cur_type, stop_type;
-  gint64 cur, stop;
-  gboolean flush;
-  gboolean update;
-  GstSegment seeksegment;
-  GstEvent *new_event;
-
-  GST_DEBUG_OBJECT (demux, "doing seek");
-
-  /* first bring the event format to TIME, our native format
-   * to perform the seek on */
-  if (event) {
-    GstFormat conv;
-
-    gst_event_parse_seek (event, &rate, &format, &flags,
-        &cur_type, &cur, &stop_type, &stop);
-
-    /* can't seek backwards yet */
-    if (rate <= 0.0)
-      goto wrong_rate;
-
-    /* convert input format to TIME */
-    conv = GST_FORMAT_TIME;
-    if (!(gst_rsdemux_convert_src_pair (demux, pad,
-                format, cur, stop, conv, &cur, &stop)))
-      goto no_format;
-
-    format = GST_FORMAT_TIME;
-  } else {
-    flags = GST_SEEK_FLAG_NONE;
-  }
-
-  demux->segment_seqnum = gst_event_get_seqnum (event);
-
-  flush = flags & GST_SEEK_FLAG_FLUSH;
-
-  /* send flush start */
-  if (flush) {
-    new_event = gst_event_new_flush_start ();
-    gst_event_set_seqnum (new_event, demux->segment_seqnum);
-    gst_rsdemux_push_event (demux, new_event);
-  } else {
-    gst_pad_pause_task (demux->sinkpad);
-  }
-
-  /* grab streaming lock, this should eventually be possible, either
-   * because the task is paused or our streaming thread stopped
-   * because our peer is flushing. */
-  GST_PAD_STREAM_LOCK (demux->sinkpad);
-
-  /* make copy into temp structure, we can only update the main one
-   * when the subclass actually could to the seek. */
-  memcpy (&seeksegment, &demux->time_segment, sizeof (GstSegment));
-
-  /* now configure the seek segment */
-  if (event) {
-    gst_segment_do_seek (&seeksegment, rate, format, flags,
-        cur_type, cur, stop_type, stop, &update);
-  }
-
-  GST_DEBUG_OBJECT (demux, "segment configured from %" G_GINT64_FORMAT
-      " to %" G_GINT64_FORMAT ", position %" G_GINT64_FORMAT,
-      seeksegment.start, seeksegment.stop, seeksegment.position);
-
-  /* do the seek, segment.position contains new position. */
-  res = gst_rsdemux_do_seek (demux, &seeksegment);
-
-  /* and prepare to continue streaming */
-  if (flush) {
-    /* send flush stop, peer will accept data and events again. We
-     * are not yet providing data as we still have the STREAM_LOCK. */
-    new_event = gst_event_new_flush_stop (TRUE);
-    gst_event_set_seqnum (new_event, demux->segment_seqnum);
-    gst_rsdemux_push_event (demux, new_event);
-  }
-
-  /* if successful seek, we update our real segment and push
-   * out the new segment. */
-  if (res) {
-    memcpy (&demux->time_segment, &seeksegment, sizeof (GstSegment));
-
-    if (demux->time_segment.flags & GST_SEEK_FLAG_SEGMENT) {
-      GstMessage *message;
-
-      message = gst_message_new_segment_start (GST_OBJECT_CAST (demux),
-          demux->time_segment.format, demux->time_segment.position);
-      gst_message_set_seqnum (message, demux->segment_seqnum);
-      gst_element_post_message (GST_ELEMENT_CAST (demux), message);
-    }
-    if ((stop = demux->time_segment.stop) == -1)
-      stop = demux->time_segment.duration;
-
-    GST_INFO_OBJECT (demux,
-        "Saving newsegment event to be sent in streaming thread");
-
-    if (demux->pending_segment)
-      gst_event_unref (demux->pending_segment);
-
-    demux->pending_segment = gst_event_new_segment (&demux->time_segment);
-    gst_event_set_seqnum (demux->pending_segment, demux->segment_seqnum);
-
-    demux->need_segment = FALSE;
-  }
-
-  /* and restart the task in case it got paused explicitly or by
-   * the FLUSH_START event we pushed out. */
-  gst_pad_start_task (demux->sinkpad, (GstTaskFunction) gst_rsdemux_loop,
-      demux->sinkpad, NULL);
-
-  /* and release the lock again so we can continue streaming */
-  GST_PAD_STREAM_UNLOCK (demux->sinkpad);
-
-  return TRUE;
-
-  /* ERRORS */
-wrong_rate:
-  {
-    GST_DEBUG_OBJECT (demux, "negative playback rate %lf not supported.", rate);
-    return FALSE;
-  }
-no_format:
-  {
-    GST_DEBUG_OBJECT (demux, "cannot convert to TIME format, seek aborted.");
-    return FALSE;
-  }
-}
 
 static gboolean
 gst_rsdemux_send_event (GstElement * element, GstEvent * event)
@@ -1239,8 +1011,8 @@ gst_rsdemux_send_event (GstElement * element, GstEvent * event)
       } else {
         GST_OBJECT_UNLOCK (rsdemux);
 
-        if (rsdemux->seek_handler)
-          res = rsdemux->seek_handler (rsdemux, rsdemux->colorsrcpad, event);
+        // if (rsdemux->seek_handler)
+        //   res = rsdemux->seek_handler (rsdemux, rsdemux->colorsrcpad, event);
         gst_event_unref (event);
       }
       break;
@@ -1264,12 +1036,6 @@ gst_rsdemux_handle_src_event (GstPad * pad, GstObject * parent,
   rsdemux = GST_RSDEMUX (parent);
 
   switch (GST_EVENT_TYPE (event)) {
-    case GST_EVENT_SEEK:
-      /* seek handler is installed based on scheduling mode */
-      if (rsdemux->seek_handler)
-        res = rsdemux->seek_handler (rsdemux, pad, event);
-      gst_event_unref (event);
-      break;
     default:
       res = gst_pad_push_event (rsdemux->sinkpad, event);
       break;
@@ -1278,170 +1044,68 @@ gst_rsdemux_handle_src_event (GstPad * pad, GstObject * parent,
   return res;
 }
 
-/* does not take ownership of buffer */
-static GstFlowReturn
-gst_rsdemux_demux_audio (GstRSDemux * rsdemux, GstBuffer * buffer,
-    guint64 duration)
-{
-  gint num_samples;
-  GstFlowReturn ret;
-  GstMapInfo map;
-
-  gst_buffer_map (buffer, &map, GST_MAP_READ);
-//   dv_decode_full_audio (rsdemux->decoder, map.data, rsdemux->audio_buffers);
-  gst_buffer_unmap (buffer, &map);
-/*
-  if (G_LIKELY ((num_samples = dv_get_num_samples (rsdemux->decoder)) > 0)) {
-    gint16 *a_ptr;
-    gint i, j;
-    GstBuffer *outbuf;
-    gint frequency, channels;
-
-    // get initial format or check if format changed 
-    frequency = dv_get_frequency (rsdemux->decoder);
-    channels = dv_get_num_channels (rsdemux->decoder);
-
-    if (G_UNLIKELY ((rsdemux->audiosrcpad == NULL)
-            || (frequency != rsdemux->frequency)
-            || (channels != rsdemux->channels))) {
-      GstCaps *caps;
-      GstAudioInfo info;
-
-      rsdemux->frequency = frequency;
-      rsdemux->channels = channels;
-
-      gst_audio_info_init (&info);
-      gst_audio_info_set_format (&info, GST_AUDIO_FORMAT_S16LE,
-          frequency, channels, NULL);
-      caps = gst_audio_info_to_caps (&info);
-      if (G_UNLIKELY (rsdemux->audiosrcpad == NULL)) {
-        rsdemux->audiosrcpad =
-            gst_rsdemux_add_pad (rsdemux, &audio_src_temp, caps);
-
-        if (rsdemux->colorsrcpad && rsdemux->audiosrcpad)
-          gst_element_no_more_pads (GST_ELEMENT (rsdemux));
-
-      } else {
-        gst_pad_set_caps (rsdemux->audiosrcpad, caps);
-      }
-      gst_caps_unref (caps);
-    }
-
-    outbuf = gst_buffer_new_and_alloc (num_samples *
-        sizeof (gint16) * rsdemux->channels);
-
-    gst_buffer_map (outbuf, &map, GST_MAP_WRITE);
-    a_ptr = (gint16 *) map.data;
-
-    for (i = 0; i < num_samples; i++) {
-      for (j = 0; j < rsdemux->channels; j++) {
-        *(a_ptr++) = rsdemux->audio_buffers[j][i];
-      }
-    }
-    gst_buffer_unmap (outbuf, &map);
-
-    GST_DEBUG ("pushing audio %" GST_TIME_FORMAT,
-        GST_TIME_ARGS (rsdemux->time_segment.position));
-
-    GST_BUFFER_TIMESTAMP (outbuf) = rsdemux->time_segment.position;
-    GST_BUFFER_DURATION (outbuf) = duration;
-    GST_BUFFER_OFFSET (outbuf) = rsdemux->audio_offset;
-    rsdemux->audio_offset += num_samples;
-    GST_BUFFER_OFFSET_END (outbuf) = rsdemux->audio_offset;
-
-    if (rsdemux->new_media || rsdemux->discont)
-      GST_BUFFER_FLAG_SET (outbuf, GST_BUFFER_FLAG_DISCONT);
-    ret = gst_pad_push (rsdemux->audiosrcpad, outbuf);
-  } else {
-    // no samples *
-    ret = GST_FLOW_OK;
-  }
-*/
-  return ret;
-}
-
-/* takes ownership of buffer */
+/* takes ownership of buffer FIXME */
 static GstFlowReturn
 gst_rsdemux_demux_video (GstRSDemux * rsdemux, GstBuffer * buffer,
     guint64 duration)
 {
   GstBuffer *outbuf;
-  gint height;
+  gint height = 0;
   gboolean wide;
   GstFlowReturn ret = GST_FLOW_OK;
 
   /* get params */
   /* framerate is already up-to-date */
-  /*
-  height = rsdemux->decoder->height;
-  wide = dv_format_wide (rsdemux->decoder);
+  
+  // auto height = rsdemux->decoder->height;
+  // wide = dv_format_wide (rsdemux->decoder);
 
   // see if anything changed 
-  if (G_UNLIKELY ((rsdemux->colorsrcpad == NULL) || (rsdemux->height != height)
-          || rsdemux->wide != wide)) {
+  if (G_UNLIKELY (rsdemux->colorsrcpad == NULL) || (rsdemux->in_height != height))   // || rsdemux->in_stride_bytes != in_bytes)) 
+  {
     gint par_x, par_y;
-    GstCaps *caps;
 
-    rsdemux->height = height;
-    rsdemux->wide = wide;
-
-    if (rsdemux->decoder->system == e_dv_system_625_50) {
-      if (wide) {
-        par_x = PAL_WIDE_PAR_X;
-        par_y = PAL_WIDE_PAR_Y;
-      } else {
-        par_x = PAL_NORMAL_PAR_X;
-        par_y = PAL_NORMAL_PAR_Y;
-      }
-    } else {
-      if (wide) {
-        par_x = NTSC_WIDE_PAR_X;
-        par_y = NTSC_WIDE_PAR_Y;
-      } else {
-        par_x = NTSC_NORMAL_PAR_X;
-        par_y = NTSC_NORMAL_PAR_Y;
-      }
-    }
+    rsdemux->in_height = height;
     
-    caps = gst_caps_new_simple ("video/x-dv",
-        "systemstream", G_TYPE_BOOLEAN, FALSE,
-        "width", G_TYPE_INT, 720,
-        "height", G_TYPE_INT, height,
-        "framerate", GST_TYPE_FRACTION, rsdemux->framerate_numerator,
-        rsdemux->framerate_denominator,
-        "pixel-aspect-ratio", GST_TYPE_FRACTION, par_x, par_y, NULL);
+    auto color_caps = gst_caps_new_simple("video/x-raw", 
+      GST_VIDEO_CAPS_MAKE("{ RGB, RGBA, BGR, BGRA, GRAY16_LE, GRAY16_BE, YVYU }")
+    );
+    auto depth_caps = gst_caps_new_simple("video/x-raw", 
+      GST_VIDEO_CAPS_MAKE("{ GRAY16_LE, GRAY16_BE }")
+    );
 
-    if (G_UNLIKELY (rsdemux->colorsrcpad == NULL)) {
-      rsdemux->colorsrcpad =
-          gst_rsdemux_add_pad (rsdemux, &video_src_temp, caps);
+    if (G_UNLIKELY (rsdemux->colorsrcpad == NULL) || G_UNLIKELY(rsdemux->depthsrcpad==NULL)) 
+    {
+      rsdemux->colorsrcpad = gst_rsdemux_add_pad (rsdemux, &color_src_tmpl, color_caps);
+      rsdemux->depthsrcpad = gst_rsdemux_add_pad (rsdemux, &depth_src_tmpl, depth_caps);
 
-      if (rsdemux->colorsrcpad && rsdemux->audiosrcpad)
+      if (rsdemux->colorsrcpad && rsdemux->depthsrcpad)
         gst_element_no_more_pads (GST_ELEMENT (rsdemux));
 
-    } else {
-      gst_pad_set_caps (rsdemux->colorsrcpad, caps);
     }
-    gst_caps_unref (caps);
+    else
+    {
+      gst_pad_set_caps (rsdemux->colorsrcpad, color_caps);
+      gst_pad_set_caps (rsdemux->depthsrcpad, depth_caps);
+    }
+    gst_caps_unref (color_caps);
+    gst_caps_unref (depth_caps);
   }
-  */
+  
+  // TODO create colorbuf and depth buf and fill them
   /* takes ownership of buffer here, we just need to modify
    * the metadata. */
   outbuf = gst_buffer_make_writable (buffer);
 
-  GST_BUFFER_TIMESTAMP (outbuf) = rsdemux->time_segment.position;
-#if PROBABLY_UNUSED
-  GST_BUFFER_OFFSET (outbuf) = rsdemux->video_offset;
-  GST_BUFFER_OFFSET_END (outbuf) = rsdemux->video_offset + 1;
-#endif
   GST_BUFFER_DURATION (outbuf) = duration;
 
   if (rsdemux->new_media || rsdemux->discont)
     GST_BUFFER_FLAG_SET (outbuf, GST_BUFFER_FLAG_DISCONT);
 
-  GST_DEBUG ("pushing video %" GST_TIME_FORMAT,
-      GST_TIME_ARGS (rsdemux->time_segment.position));
-
-  ret = gst_pad_push (rsdemux->colorsrcpad, outbuf);
+#if TODO
+  ret = gst_pad_push (rsdemux->colorsrcpad, colorbuf);
+  ret = gst_pad_push (rsdemux->depthsrcpad, depthbuf);
+#endif
 #if PROBABLY_UNUSED
   rsdemux->video_offset++;
 #endif
@@ -1534,68 +1198,8 @@ gst_rsdemux_demux_frame (GstRSDemux * rsdemux, GstBuffer * buffer)
   GstFlowReturn aret, vret, ret;
   GstMapInfo map;
   guint64 duration;
-//   GstSMPTETimeCode timecode;
   int frame_number;
 
-  if (rsdemux->need_segment) {
-    GstFormat format;
-    GstEvent *event;
-
-    g_assert (!rsdemux->upstream_time_segment);
-
-    /* convert to time and store as start/end_timestamp */
-    format = GST_FORMAT_TIME;
-    if (!(gst_rsdemux_convert_sink_pair (rsdemux,
-                GST_FORMAT_BYTES, rsdemux->byte_segment.start,
-                rsdemux->byte_segment.stop, format,
-                (gint64 *) & rsdemux->time_segment.start,
-                (gint64 *) & rsdemux->time_segment.stop)))
-      goto segment_error;
-
-    rsdemux->time_segment.time = rsdemux->time_segment.start;
-    rsdemux->time_segment.rate = rsdemux->byte_segment.rate;
-
-    gst_rsdemux_sink_convert (rsdemux,
-        GST_FORMAT_BYTES, rsdemux->byte_segment.position,
-        GST_FORMAT_TIME, (gint64 *) & rsdemux->time_segment.position);
-
-#if PROBABLY_UNUSED
-    gst_rsdemux_update_frame_offsets (rsdemux, rsdemux->time_segment.position);
-#endif
-    GST_DEBUG_OBJECT (rsdemux, "sending segment start: %" GST_TIME_FORMAT
-        ", stop: %" GST_TIME_FORMAT ", time: %" GST_TIME_FORMAT,
-        GST_TIME_ARGS (rsdemux->time_segment.start),
-        GST_TIME_ARGS (rsdemux->time_segment.stop),
-        GST_TIME_ARGS (rsdemux->time_segment.start));
-
-    event = gst_event_new_segment (&rsdemux->time_segment);
-    if (rsdemux->segment_seqnum)
-      gst_event_set_seqnum (event, rsdemux->segment_seqnum);
-    gst_rsdemux_push_event (rsdemux, event);
-
-    rsdemux->need_segment = FALSE;
-  }
-
-#if PROBABLY_UNUSED
-  gst_rsdemux_get_timecode (rsdemux, buffer, &timecode);
-  gst_smpte_time_code_get_frame_number (
-      (rsdemux->decoder->system == e_dv_system_625_50) ?
-      GST_SMPTE_TIME_CODE_SYSTEM_25 : GST_SMPTE_TIME_CODE_SYSTEM_30,
-      &frame_number, &timecode);
-
-  if (rsdemux->time_segment.rate < 0) {
-    next_ts = gst_util_uint64_scale_int (
-        (rsdemux->frame_offset >
-            0 ? rsdemux->frame_offset - 1 : 0) * GST_SECOND,
-        rsdemux->framerate_denominator, rsdemux->framerate_numerator);
-    duration = rsdemux->time_segment.position - next_ts;
-  } else {
-    next_ts = gst_util_uint64_scale_int (
-        (rsdemux->frame_offset + 1) * GST_SECOND,
-        rsdemux->framerate_denominator, rsdemux->framerate_numerator);
-    duration = next_ts - rsdemux->time_segment.position;
-  }
-#endif
   gst_buffer_map (buffer, &map, GST_MAP_READ);
 //   dv_parse_packs (rsdemux->decoder, map.data);
   gst_buffer_unmap (buffer, &map);
@@ -1606,13 +1210,6 @@ gst_rsdemux_demux_frame (GstRSDemux * rsdemux, GstBuffer * buffer)
     rsdemux->frames_since_new_media = 0;
   }
   rsdemux->frames_since_new_media++;
-
-  /* does not take ownership of buffer */
-  aret = ret = gst_rsdemux_demux_audio (rsdemux, buffer, duration);
-  if (G_UNLIKELY (ret != GST_FLOW_OK && ret != GST_FLOW_NOT_LINKED)) {
-    gst_buffer_unref (buffer);
-    goto done;
-  }
 
   /* takes ownership of buffer */
   vret = ret = gst_rsdemux_demux_video (rsdemux, buffer, duration);
@@ -1626,27 +1223,6 @@ gst_rsdemux_demux_frame (GstRSDemux * rsdemux, GstBuffer * buffer)
   }
 
   rsdemux->discont = FALSE;
-  rsdemux->time_segment.position = next_ts;
-
-#if PROBABLY_UNUSED
-  if (rsdemux->time_segment.rate < 0) {
-    if (rsdemux->frame_offset > 0)
-      rsdemux->frame_offset--;
-    else
-      GST_WARNING_OBJECT (rsdemux,
-          "Got before frame offset 0 in reverse playback");
-  } else {
-    rsdemux->frame_offset++;
-  }
-#endif
-  /* check for the end of the segment */
-  if ((rsdemux->time_segment.rate > 0 && rsdemux->time_segment.stop != -1
-          && next_ts > rsdemux->time_segment.stop)
-      || (rsdemux->time_segment.rate < 0
-          && rsdemux->time_segment.start > next_ts))
-    ret = GST_FLOW_EOS;
-  else
-    ret = GST_FLOW_OK;
 
 done:
   return ret;
@@ -1662,51 +1238,51 @@ segment_error:
 
 /* flush any remaining data in the adapter, used in chain based scheduling mode */
 static GstFlowReturn
-gst_rsdemux_flush (GstRSDemux * rsdemux)
+gst_rsdemux_flush_buffer (GstRSDemux * rsdemux, GstBuffer * buffer)
 {
   GstFlowReturn ret = GST_FLOW_OK;
-/*
-  while (gst_adapter_available (rsdemux->adapter) >= rsdemux->frame_len) {
-    const guint8 *data;
-    gint length;
 
-    /* get the accumulated bytes 
-    data = gst_adapter_map (rsdemux->adapter, rsdemux->frame_len);
+  // while (gst_adapter_available (rsdemux->adapter) >= rsdemux->frame_len) {
+    // const guint8 *data;
+    // gint length;
 
-    /* parse header to know the length and other params 
-    if (G_UNLIKELY (dv_parse_header (rsdemux->decoder, data) < 0)) {
-      gst_adapter_unmap (rsdemux->adapter);
-      goto parse_header_error;
-    }
-    gst_adapter_unmap (rsdemux->adapter);
+    // get the accumulated bytes 
+    // data = gst_adapter_map (rsdemux->adapter, rsdemux->frame_len);
 
-    /* after parsing the header we know the length of the data 
-    length = rsdemux->frame_len = rsdemux->decoder->frame_size;
-    if (rsdemux->decoder->system == e_dv_system_625_50) {
-      rsdemux->framerate_numerator = PAL_FRAMERATE_NUMERATOR;
-      rsdemux->framerate_denominator = PAL_FRAMERATE_DENOMINATOR;
-    } else {
-      rsdemux->framerate_numerator = NTSC_FRAMERATE_NUMERATOR;
-      rsdemux->framerate_denominator = NTSC_FRAMERATE_DENOMINATOR;
-    }
-    g_atomic_int_set (&rsdemux->found_header, 1);
+    // parse header to know the length and other params 
+    // if (G_UNLIKELY (dv_parse_header (rsdemux->decoder, data) < 0)) {
+      // gst_adapter_unmap (rsdemux->adapter);
+      // goto parse_header_error;
+    // }
+    // gst_adapter_unmap (rsdemux->adapter);
 
-    /* let demux_video set the height, it needs to detect when things change so
-     * it can reset caps 
+    // after parsing the header we know the length of the data 
+    // length = rsdemux->frame_len = rsdemux->decoder->frame_size;
+    // if (rsdemux->decoder->system == e_dv_system_625_50) {
+      // rsdemux->framerate_numerator = PAL_FRAMERATE_NUMERATOR;
+      // rsdemux->framerate_denominator = PAL_FRAMERATE_DENOMINATOR;
+    // } else {
+      // rsdemux->framerate_numerator = NTSC_FRAMERATE_NUMERATOR;
+      // rsdemux->framerate_denominator = NTSC_FRAMERATE_DENOMINATOR;
+    // }
+    // g_atomic_int_set (&rsdemux->found_header, 1);
 
-    /* if we still have enough for a frame, start decoding 
-    if (G_LIKELY (gst_adapter_available (rsdemux->adapter) >= length)) {
-      GstBuffer *buffer;
+    // let demux_video set the height, it needs to detect when things change so
+    // it can reset caps 
 
-      buffer = gst_adapter_take_buffer (rsdemux->adapter, length);
+    // if we still have enough for a frame, start decoding 
+    // if (G_LIKELY (gst_adapter_available (rsdemux->adapter) >= length)) {
+      // GstBuffer *buffer;
 
-      /* and decode the buffer, takes ownership 
+      // buffer = gst_adapter_take_buffer (rsdemux->adapter, length);
+
+      // and decode the buffer, takes ownership 
       ret = gst_rsdemux_demux_frame (rsdemux, buffer);
       if (G_UNLIKELY (ret != GST_FLOW_OK))
         goto done;
-    }
-  }
-  */
+    // }
+  // }
+  
 done:
   return ret;
 
@@ -1714,9 +1290,17 @@ done:
 parse_header_error:
   {
     GST_ELEMENT_ERROR (rsdemux, STREAM, DECODE,
-        (NULL), ("Error parsing DV header"));
+        (NULL), ("Error parsing header"));
     return GST_FLOW_ERROR;
   }
+}
+
+/* flush any remaining data in the adapter, used in chain based scheduling mode */
+static GstFlowReturn
+gst_rsdemux_flush (GstRSDemux * rsdemux)
+{
+  // TODO What do we need to do in _flush?
+  return GST_FLOW_OK;
 }
 
 /* streaming operation: 
@@ -1726,253 +1310,42 @@ parse_header_error:
 static GstFlowReturn
 gst_rsdemux_chain (GstPad * pad, GstObject * parent, GstBuffer * buffer)
 {
-  GstRSDemux *rsdemux;
   GstFlowReturn ret;
   GstClockTime timestamp;
+  // GstRSDemux *rsdemux;
+  auto rsdemux = GST_RSDEMUX (parent);
 
-  rsdemux = GST_RSDEMUX (parent);
-
-  /* a discontinuity in the stream, we need to get rid of
-   * accumulated data in the adapter and assume a new frame
-   * starts after the discontinuity */
-  if (G_UNLIKELY (GST_BUFFER_FLAG_IS_SET (buffer, GST_BUFFER_FLAG_DISCONT))) {
-    // gst_adapter_clear (rsdemux->adapter);
-    rsdemux->discont = TRUE;
-
-    /* Should recheck where we are */
-    if (!rsdemux->upstream_time_segment)
-      rsdemux->need_segment = TRUE;
-  }
+  // Probably don't need to deal with discontinuity
 
   /* a timestamp always should be respected */
   timestamp = GST_BUFFER_TIMESTAMP (buffer);
-  if (GST_CLOCK_TIME_IS_VALID (timestamp)) {
-    rsdemux->time_segment.position = timestamp;
-#if PROBABLY_UNUSED
-    if (rsdemux->discont)
-      gst_rsdemux_update_frame_offsets (rsdemux,
-          rsdemux->time_segment.position);
-#endif
-  } else if (rsdemux->upstream_time_segment && rsdemux->discont) {
-    /* This will probably fail later to provide correct
-     * timestamps and/or durations but also should not happen */
-    GST_ERROR_OBJECT (rsdemux,
-        "Upstream provides TIME segment but no PTS after discont");
-  }
-
-//   gst_adapter_push (rsdemux->adapter, buffer);
+  // if (GST_CLOCK_TIME_IS_VALID (timestamp)) 
+  // {
+  //   rsdemux->time_segment.position = timestamp;
+  // } 
+  // else if (rsdemux->upstream_time_segment && rsdemux->discont) 
+  // {
+  //   /* This will probably fail later to provide correct
+  //    * timestamps and/or durations but also should not happen */
+  //   GST_ERROR_OBJECT (rsdemux,
+  //       "Upstream provides TIME segment but no PTS after discont");
+  // }
 
   /* Apparently dv_parse_header can read from the body of the frame
    * too, so it needs more than header_size bytes. Wacky!
    */
   if (G_UNLIKELY (rsdemux->frame_len == -1)) {
-    /* if we don't know the length of a frame, we assume it is
+    /* FIXME: realsense can put out different size buffers 
+      if we don't know the length of a frame, we assume it is
      * the NTSC_BUFFER length, as this is enough to figure out 
      * if this is PAL or NTSC */
     rsdemux->frame_len = NTSC_BUFFER;
   }
 
   /* and try to flush pending frames */
-  ret = gst_rsdemux_flush (rsdemux);
+  ret = gst_rsdemux_flush_buffer (rsdemux, buffer);
 
   return ret;
-}
-
-/* pull based operation.
- *
- * Read header first to figure out the frame size. Then read
- * and decode full frames.
- */
-static void
-gst_rsdemux_loop (GstPad * pad)
-{
-  GstFlowReturn ret;
-  GstRSDemux *rsdemux;
-  GstBuffer *buffer = NULL;
-  GstMapInfo map;
-
-  rsdemux = GST_RSDEMUX (gst_pad_get_parent (pad));
-
-  if (G_UNLIKELY (g_atomic_int_get (&rsdemux->found_header) == 0)) {
-    GST_DEBUG_OBJECT (rsdemux, "pulling first buffer");
-    /* pull in NTSC sized buffer to figure out the frame
-     * length */
-    ret = gst_pad_pull_range (rsdemux->sinkpad,
-        rsdemux->byte_segment.position, NTSC_BUFFER, &buffer);
-    if (G_UNLIKELY (ret != GST_FLOW_OK))
-      goto pause;
-
-    /* check buffer size, don't want to read small buffers */
-    if (G_UNLIKELY (gst_buffer_get_size (buffer) < NTSC_BUFFER))
-      goto small_buffer;
-
-    gst_buffer_map (buffer, &map, GST_MAP_READ);
-    /* parse header to know the length and other params */
-    // if (G_UNLIKELY (dv_parse_header (rsdemux->decoder, map.data) < 0)) {
-    //   gst_buffer_unmap (buffer, &map);
-    //   goto parse_header_error;
-    // }
-    gst_buffer_unmap (buffer, &map);
-
-    /* after parsing the header we know the length of the data */
-    // rsdemux->frame_len = rsdemux->decoder->frame_size;
-    // if (rsdemux->decoder->system == e_dv_system_625_50) {
-    //   rsdemux->framerate_numerator = PAL_FRAMERATE_NUMERATOR;
-    //   rsdemux->framerate_denominator = PAL_FRAMERATE_DENOMINATOR;
-    // } else 
-    {
-      rsdemux->framerate_numerator = NTSC_FRAMERATE_NUMERATOR;
-      rsdemux->framerate_denominator = NTSC_FRAMERATE_DENOMINATOR;
-    }
-    rsdemux->need_segment = TRUE;
-
-    /* see if we need to read a larger part */
-    if (rsdemux->frame_len != NTSC_BUFFER) {
-      gst_buffer_unref (buffer);
-      buffer = NULL;
-    }
-
-    {
-      GstEvent *event;
-
-      /* setting header and prrforming the seek must be atomic */
-      GST_OBJECT_LOCK (rsdemux);
-      /* got header now */
-      g_atomic_int_set (&rsdemux->found_header, 1);
-
-      /* now perform pending seek if any. */
-      event = rsdemux->seek_event;
-      if (event)
-        gst_event_ref (event);
-      GST_OBJECT_UNLOCK (rsdemux);
-
-      if (event) {
-        if (!gst_rsdemux_handle_pull_seek (rsdemux, rsdemux->colorsrcpad,
-                event)) {
-          GST_ELEMENT_WARNING (rsdemux, STREAM, DECODE, (NULL),
-              ("Error performing initial seek"));
-        }
-        gst_event_unref (event);
-
-        /* and we need to pull a new buffer in all cases. */
-        if (buffer) {
-          gst_buffer_unref (buffer);
-          buffer = NULL;
-        }
-      }
-    }
-  }
-
-  if (G_UNLIKELY (rsdemux->pending_segment)) {
-
-    /* now send the newsegment */
-    GST_DEBUG_OBJECT (rsdemux, "Sending newsegment from");
-
-    gst_rsdemux_push_event (rsdemux, rsdemux->pending_segment);
-    rsdemux->pending_segment = NULL;
-  }
-
-  if (G_LIKELY (buffer == NULL)) {
-    GST_DEBUG_OBJECT (rsdemux, "pulling buffer at offset %" G_GINT64_FORMAT,
-        rsdemux->byte_segment.position);
-
-    ret = gst_pad_pull_range (rsdemux->sinkpad,
-        rsdemux->byte_segment.position, rsdemux->frame_len, &buffer);
-    if (ret != GST_FLOW_OK)
-      goto pause;
-
-    /* check buffer size, don't want to read small buffers */
-    if (gst_buffer_get_size (buffer) < rsdemux->frame_len)
-      goto small_buffer;
-  }
-  /* and decode the buffer */
-  ret = gst_rsdemux_demux_frame (rsdemux, buffer);
-  if (G_UNLIKELY (ret != GST_FLOW_OK))
-    goto pause;
-
-  /* and position ourselves for the next buffer */
-  rsdemux->byte_segment.position += rsdemux->frame_len;
-
-done:
-  gst_object_unref (rsdemux);
-
-  return;
-
-  /* ERRORS */
-parse_header_error:
-  {
-    GstEvent *event;
-
-    GST_ELEMENT_ERROR (rsdemux, STREAM, DECODE,
-        (NULL), ("Error parsing DV header"));
-    gst_buffer_unref (buffer);
-    gst_pad_pause_task (rsdemux->sinkpad);
-    event = gst_event_new_eos ();
-    if (rsdemux->segment_seqnum)
-      gst_event_set_seqnum (event, rsdemux->segment_seqnum);
-    gst_rsdemux_push_event (rsdemux, event);
-    goto done;
-  }
-small_buffer:
-  {
-    GstEvent *event;
-
-    GST_ELEMENT_ERROR (rsdemux, STREAM, DECODE,
-        (NULL), ("Error reading buffer"));
-    gst_buffer_unref (buffer);
-    gst_pad_pause_task (rsdemux->sinkpad);
-    event = gst_event_new_eos ();
-    if (rsdemux->segment_seqnum)
-      gst_event_set_seqnum (event, rsdemux->segment_seqnum);
-    gst_rsdemux_push_event (rsdemux, event);
-    goto done;
-  }
-pause:
-  {
-    GST_INFO_OBJECT (rsdemux, "pausing task, %s", gst_flow_get_name (ret));
-    gst_pad_pause_task (rsdemux->sinkpad);
-    if (ret == GST_FLOW_EOS) {
-      GST_LOG_OBJECT (rsdemux, "got eos");
-      /* so align our position with the end of it, if there is one
-       * this ensures a subsequent will arrive at correct base/acc time */
-      if (rsdemux->time_segment.rate > 0.0 &&
-          GST_CLOCK_TIME_IS_VALID (rsdemux->time_segment.stop))
-        rsdemux->time_segment.position = rsdemux->time_segment.stop;
-      else if (rsdemux->time_segment.rate < 0.0)
-        rsdemux->time_segment.position = rsdemux->time_segment.start;
-      /* perform EOS logic */
-      if (rsdemux->time_segment.flags & GST_SEEK_FLAG_SEGMENT) {
-        GstMessage *message;
-        GstEvent *event;
-
-        event = gst_event_new_segment_done (rsdemux->time_segment.format,
-            rsdemux->time_segment.position);
-        if (rsdemux->segment_seqnum)
-          gst_event_set_seqnum (event, rsdemux->segment_seqnum);
-
-        message = gst_message_new_segment_done (GST_OBJECT_CAST (rsdemux),
-            rsdemux->time_segment.format, rsdemux->time_segment.position);
-        if (rsdemux->segment_seqnum)
-          gst_message_set_seqnum (message, rsdemux->segment_seqnum);
-
-        gst_element_post_message (GST_ELEMENT (rsdemux), message);
-        gst_rsdemux_push_event (rsdemux, event);
-      } else {
-        GstEvent *event = gst_event_new_eos ();
-        if (rsdemux->segment_seqnum)
-          gst_event_set_seqnum (event, rsdemux->segment_seqnum);
-        gst_rsdemux_push_event (rsdemux, event);
-      }
-    } else if (ret == GST_FLOW_NOT_LINKED || ret < GST_FLOW_EOS) {
-      GstEvent *event = gst_event_new_eos ();
-      /* for fatal errors or not-linked we post an error message */
-      GST_ELEMENT_FLOW_ERROR (rsdemux, ret);
-      if (rsdemux->segment_seqnum)
-        gst_event_set_seqnum (event, rsdemux->segment_seqnum);
-      gst_rsdemux_push_event (rsdemux, event);
-    }
-    goto done;
-  }
 }
 
 static gboolean
@@ -1983,23 +1356,13 @@ gst_rsdemux_sink_activate_mode (GstPad * sinkpad, GstObject * parent,
   GstRSDemux *demux = GST_RSDEMUX (parent);
 
   switch (mode) {
-    case GST_PAD_MODE_PULL:
-      if (active) {
-        demux->seek_handler = gst_rsdemux_handle_pull_seek;
-        res = gst_pad_start_task (sinkpad,
-            (GstTaskFunction) gst_rsdemux_loop, sinkpad, NULL);
-      } else {
-        demux->seek_handler = NULL;
-        res = gst_pad_stop_task (sinkpad);
-      }
-      break;
     case GST_PAD_MODE_PUSH:
       if (active) {
         GST_DEBUG_OBJECT (demux, "activating push/chain function");
-        demux->seek_handler = gst_rsdemux_handle_push_seek;
+        // demux->seek_handler = gst_rsdemux_handle_push_seek;
       } else {
         GST_DEBUG_OBJECT (demux, "deactivating push/chain function");
-        demux->seek_handler = NULL;
+        // demux->seek_handler = NULL;
       }
       res = TRUE;
       break;

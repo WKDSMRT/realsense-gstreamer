@@ -84,12 +84,14 @@ struct _GstRSDemux {
   gint           framerate_denominator;
   gboolean       discont;
 
-  GstDVDemuxSeekHandler seek_handler;
-  GstSegment     byte_segment;
-  gboolean       upstream_time_segment;
-  GstSegment     time_segment;
-  gboolean       need_segment;
-  guint32        segment_seqnum;
+// Seem to be for seeking
+  // GstDVDemuxSeekHandler seek_handler;
+  // GstSegment     byte_segment;
+  // gboolean       upstream_time_segment;
+  // GstSegment     time_segment;
+  // gboolean       need_segment;
+  // guint32        segment_seqnum;
+
   gboolean       new_media;
   int            frames_since_new_media;
   
