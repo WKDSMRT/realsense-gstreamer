@@ -278,17 +278,9 @@ gst_rsdemux_reset (GstRSDemux * rsdemux)
   rsdemux->depth_width = 0;
   rsdemux->depth_stride_bytes = 0;
 
-  rsdemux->discont = TRUE;
   g_atomic_int_set (&rsdemux->found_header, 0);
   rsdemux->frame_len = -1;
-  // rsdemux->need_segment = FALSE;
   rsdemux->new_media = FALSE;
-  rsdemux->framerate_numerator = 0;
-  rsdemux->framerate_denominator = 0;
-  // gst_segment_init (&rsdemux->byte_segment, GST_FORMAT_BYTES);
-  // gst_segment_init (&rsdemux->time_segment, GST_FORMAT_TIME);
-  // rsdemux->segment_seqnum = 0;
-  // rsdemux->upstream_time_segment = FALSE;
   rsdemux->have_group_id = FALSE;
   rsdemux->group_id = G_MAXUINT;
   rsdemux->tag_event = NULL;
@@ -432,10 +424,7 @@ gst_rsdemux_src_convert (GstRSDemux * rsdemux, GstPad * pad,
 #endif
           break;
         case GST_FORMAT_TIME:
-          if (pad == rsdemux->colorsrcpad || pad == rsdemux->depthsrcpad)
-            *dest_value = gst_util_uint64_scale (src_value,
-                GST_SECOND * rsdemux->framerate_denominator,
-                rsdemux->frame_len * rsdemux->framerate_numerator);
+
 #if AUDIO_SRC                
           else if (pad == rsdemux->audiosrcpad)
             *dest_value = gst_util_uint64_scale_int (src_value, GST_SECOND,
@@ -449,10 +438,6 @@ gst_rsdemux_src_convert (GstRSDemux * rsdemux, GstPad * pad,
     case GST_FORMAT_TIME:
       switch (dest_format) {
         case GST_FORMAT_BYTES:
-          if (pad == rsdemux->colorsrcpad || pad == rsdemux->depthsrcpad)
-            *dest_value = gst_util_uint64_scale (src_value,
-                rsdemux->frame_len * rsdemux->framerate_numerator,
-                rsdemux->framerate_denominator * GST_SECOND);
 #if AUDIO_SRC                
           else if (pad == rsdemux->audiosrcpad)
             *dest_value = gst_util_uint64_scale_int (src_value,
@@ -461,12 +446,6 @@ gst_rsdemux_src_convert (GstRSDemux * rsdemux, GstPad * pad,
           break;
         case GST_FORMAT_DEFAULT:
           if (pad == rsdemux->colorsrcpad || pad == rsdemux->depthsrcpad) {
-            if (src_value)
-              *dest_value = gst_util_uint64_scale (src_value,
-                  rsdemux->framerate_numerator,
-                  rsdemux->framerate_denominator * GST_SECOND);
-            else
-              *dest_value = 0;
           }
 #if AUDIO_SRC
           else if (pad == rsdemux->audiosrcpad) {
@@ -482,11 +461,6 @@ gst_rsdemux_src_convert (GstRSDemux * rsdemux, GstPad * pad,
     case GST_FORMAT_DEFAULT:
       switch (dest_format) {
         case GST_FORMAT_TIME:
-          if (pad == rsdemux->colorsrcpad || pad == rsdemux->depthsrcpad) {
-            *dest_value = gst_util_uint64_scale (src_value,
-                GST_SECOND * rsdemux->framerate_denominator,
-                rsdemux->framerate_numerator);
-          } 
 #if AUDIO_SRC
           else if (pad == rsdemux->audiosrcpad) {
             if (src_value)
@@ -559,9 +533,6 @@ gst_rsdemux_sink_convert (GstRSDemux * rsdemux, GstFormat src_format,
            * line and the next line. */
           frame = src_value / rsdemux->frame_len;
 
-          *dest_value = gst_util_uint64_scale (frame,
-              GST_SECOND * rsdemux->framerate_denominator,
-              rsdemux->framerate_numerator);
           break;
         }
         default:
@@ -572,15 +543,8 @@ gst_rsdemux_sink_convert (GstRSDemux * rsdemux, GstFormat src_format,
       switch (dest_format) {
         case GST_FORMAT_BYTES:
         {
-          guint64 frame;
 
-          /* calculate the frame */
-          frame =
-              gst_util_uint64_scale (src_value, rsdemux->framerate_numerator,
-              rsdemux->framerate_denominator * GST_SECOND);
 
-          /* calculate the offset from the rounded frame */
-          *dest_value = frame * rsdemux->frame_len;
           break;
         }
         default:
@@ -802,7 +766,6 @@ gst_rsdemux_handle_sink_event (GstPad * pad, GstObject * parent,
       GST_DEBUG ("cleared adapter");
       // gst_segment_init (&rsdemux->byte_segment, GST_FORMAT_BYTES);
       // gst_segment_init (&rsdemux->time_segment, GST_FORMAT_TIME);
-      rsdemux->discont = TRUE;
       res = gst_rsdemux_push_event (rsdemux, event);
       break;
     case GST_EVENT_EOS:
@@ -1117,8 +1080,12 @@ gst_rsdemux_demux_video (GstRSDemux * rsdemux, GstBuffer * buffer,
   // TODO What is duration?
   GST_BUFFER_DURATION (outbuf) = duration;
 
-  if (rsdemux->new_media || rsdemux->discont)
+  if (rsdemux->new_media)// || rsdemux->discont)
     GST_BUFFER_FLAG_SET (outbuf, GST_BUFFER_FLAG_DISCONT);
+
+  gst_buffer_unmap(buffer, &inmap);
+  gst_buffer_unmap(colorbuf, &cmap);
+  gst_buffer_unmap(depthbuf, &dmap);
 
   ret = gst_pad_push (rsdemux->colorsrcpad, colorbuf);
   ret = gst_pad_push (rsdemux->depthsrcpad, depthbuf);
@@ -1191,7 +1158,6 @@ gst_rsdemux_demux_frame (GstRSDemux * rsdemux, GstBuffer * buffer)
     goto done;
   }
 
-  rsdemux->discont = FALSE;
 
 done:
   return ret;

@@ -80,9 +80,6 @@ struct _GstRSDemux {
 
 // TODO What do these values do? Are they needed?
   gint           frame_len;
-  gint           framerate_numerator;
-  gint           framerate_denominator;
-  gboolean       discont;
 
 // Seem to be for seeking
   // GstDVDemuxSeekHandler seek_handler;
