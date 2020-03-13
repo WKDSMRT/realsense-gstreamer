@@ -27,6 +27,7 @@
 // #include <gst/audio/audio.h>
 #include "gstrealsensedemux.h"
 // #include "gstsmptetimecode.h"
+#include "gstrealsenseplugin.h"
 
 /**
  * SECTION:element-rsdemux
@@ -123,14 +124,14 @@ static GstStaticPadTemplate sink_tmpl = GST_STATIC_PAD_TEMPLATE ("sink",
 
 static GstStaticPadTemplate color_src_tmpl = GST_STATIC_PAD_TEMPLATE ("color",
     GST_PAD_SRC,
-    GST_PAD_ALWAYS,
+    GST_PAD_SOMETIMES,
     GST_STATIC_CAPS (GST_VIDEO_CAPS_MAKE
         ("{ RGB, RGBA, BGR, BGRA, GRAY16_LE, GRAY16_BE, YVYU }"))
     );
 
 static GstStaticPadTemplate depth_src_tmpl = GST_STATIC_PAD_TEMPLATE ("depth",
     GST_PAD_SRC,
-    GST_PAD_ALWAYS,
+    GST_PAD_SOMETIMES,
     GST_STATIC_CAPS (GST_VIDEO_CAPS_MAKE
         ("{ GRAY16_LE, GRAY16_BE }"))
     );
@@ -1095,69 +1096,37 @@ gst_rsdemux_demux_video (GstRSDemux * rsdemux, GstBuffer * buffer,
   // TODO create colorbuf and depth buf and fill them
   /* takes ownership of buffer here, we just need to modify
    * the metadata. */
-  outbuf = gst_buffer_make_writable (buffer);
+  // outbuf = gst_buffer_make_writable (buffer);
+  GstMapInfo inmap, cmap, dmap;
+  gst_buffer_map(buffer, &inmap, GST_MAP_READ);
 
+  auto header = (RSHeader*)inmap.data;
+
+  auto color_sz = header->color_height * header->color_stride;
+  auto colorbuf = gst_buffer_new_and_alloc( color_sz);
+  gst_buffer_map(colorbuf, &cmap, GST_MAP_WRITE);
+  auto cdata = inmap.data + sizeof(RSHeader);
+  memcpy(cmap.data, cdata, color_sz);
+
+  auto depth_sz = header->depth_height * header->depth_stride;
+  auto depthbuf = gst_buffer_new_and_alloc( depth_sz);
+  gst_buffer_map(colorbuf, &dmap, GST_MAP_WRITE);
+  auto ddata = cdata + color_sz;
+  memcpy(dmap.data, ddata, color_sz);
+
+  // TODO What is duration?
   GST_BUFFER_DURATION (outbuf) = duration;
 
   if (rsdemux->new_media || rsdemux->discont)
     GST_BUFFER_FLAG_SET (outbuf, GST_BUFFER_FLAG_DISCONT);
 
-#if TODO
   ret = gst_pad_push (rsdemux->colorsrcpad, colorbuf);
   ret = gst_pad_push (rsdemux->depthsrcpad, depthbuf);
-#endif
 #if PROBABLY_UNUSED
   rsdemux->video_offset++;
 #endif
   return ret;
 }
-
-static int
-get_ssyb_offset (int dif, int ssyb)
-{
-  int offset;
-
-  offset = dif * 12000;         /* to dif */
-  offset += 80 * (1 + (ssyb / 6));      /* to subcode pack */
-  offset += 3;                  /* past header */
-  offset += 8 * (ssyb % 6);     /* to ssyb */
-
-  return offset;
-}
-
-/*static gboolean
-gst_rsdemux_get_timecode (GstRSDemux * rsdemux, GstBuffer * buffer,
-    GstSMPTETimeCode * timecode)
-{
-  guint8 *data;
-  GstMapInfo map;
-  int offset;
-  int dif;
-  int n_difs = rsdemux->decoder->num_dif_seqs;
-
-  gst_buffer_map (buffer, &map, GST_MAP_READ);
-  data = map.data;
-  for (dif = 0; dif < n_difs; dif++) {
-    offset = get_ssyb_offset (dif, 3);
-    if (data[offset + 3] == 0x13) {
-      timecode->frames = ((data[offset + 4] >> 4) & 0x3) * 10 +
-          (data[offset + 4] & 0xf);
-      timecode->seconds = ((data[offset + 5] >> 4) & 0x3) * 10 +
-          (data[offset + 5] & 0xf);
-      timecode->minutes = ((data[offset + 6] >> 4) & 0x3) * 10 +
-          (data[offset + 6] & 0xf);
-      timecode->hours = ((data[offset + 7] >> 4) & 0x3) * 10 +
-          (data[offset + 7] & 0xf);
-      GST_DEBUG ("got timecode %" GST_SMPTE_TIME_CODE_FORMAT,
-          GST_SMPTE_TIME_CODE_ARGS (timecode));
-      gst_buffer_unmap (buffer, &map);
-      return TRUE;
-    }
-  }
-
-  gst_buffer_unmap (buffer, &map);
-  return FALSE;
-}*/
 
 static gboolean
 gst_rsdemux_is_new_media (GstRSDemux * rsdemux, GstBuffer * buffer)
@@ -1319,17 +1288,6 @@ gst_rsdemux_chain (GstPad * pad, GstObject * parent, GstBuffer * buffer)
 
   /* a timestamp always should be respected */
   timestamp = GST_BUFFER_TIMESTAMP (buffer);
-  // if (GST_CLOCK_TIME_IS_VALID (timestamp)) 
-  // {
-  //   rsdemux->time_segment.position = timestamp;
-  // } 
-  // else if (rsdemux->upstream_time_segment && rsdemux->discont) 
-  // {
-  //   /* This will probably fail later to provide correct
-  //    * timestamps and/or durations but also should not happen */
-  //   GST_ERROR_OBJECT (rsdemux,
-  //       "Upstream provides TIME segment but no PTS after discont");
-  // }
 
   /* Apparently dv_parse_header can read from the body of the frame
    * too, so it needs more than header_size bytes. Wacky!

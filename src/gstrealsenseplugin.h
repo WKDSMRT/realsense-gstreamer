@@ -89,6 +89,17 @@ enum StreamType
   StreamMux // Color and depth crammed into the same buffer
 };
 
+struct RSHeader {
+  gint color_height;
+  gint color_width;
+  gint color_stride;
+  GstVideoFormat color_format;
+  gint depth_height;
+  gint depth_width;
+  gint depth_stride;
+  GstVideoFormat depth_format;
+};
+
 struct _GstRealsenseSrc
 {
   GstPushSrc element;

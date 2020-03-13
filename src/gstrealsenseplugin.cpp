@@ -253,24 +253,39 @@ gst_realsense_src_create_buffer_from_frameset (GstRealsenseSrc * src, rs2::frame
   auto color_sz = cframe.get_height() * src->gst_stride;
   auto depth = frame_set.get_depth_frame();
   auto depth_sz = depth.get_data_size();
+  constexpr auto header_sz = sizeof(RSHeader);
   /* TODO: use allocator or use from pool if that's more efficient or safer*/
-  buf = gst_buffer_new_and_alloc (color_sz + depth_sz);
+  buf = gst_buffer_new_and_alloc (header_sz + color_sz + depth_sz);
 
+  auto header = RSHeader {
+    cframe.get_height(),
+    cframe.get_width(),
+    src->gst_stride,
+    src->info.finfo->format, // FIXME won't be correct if we only have depth
+    depth.get_height(),
+    depth.get_width(),
+    depth.get_stride_in_bytes(),
+    GST_VIDEO_FORMAT_GRAY16_LE //FIXME could be _LE or _BE
+  };
   gst_buffer_map (buf, &minfo, GST_MAP_WRITE);
   GST_LOG_OBJECT (src,
       "GstBuffer size=%lu, gst_stride=%d, frame_num=%llu",
       minfo.size, src->gst_stride, cframe.get_frame_number());
   GST_LOG_OBJECT (src, "Buffer timestamp %f", cframe.get_timestamp());
 
+  memcpy(minfo.data, &header, sizeof(header));
+
   // TODO refactor this section into cleaner code
   int rs_stride = 0;
   if(src->stream_type == StreamType::StreamColor || src->stream_type == StreamType::StreamMux) 
   {
+    auto outdata = minfo.data + sizeof(RSHeader);
     rs_stride = cframe.get_stride_in_bytes();
       /* TODO: use orc_memcpy */
     if (src->gst_stride == rs_stride) 
     {
-      memcpy (minfo.data, ((guint8 *) cframe.get_data()), color_sz);
+      memcpy (outdata, ((guint8 *) cframe.get_data()), color_sz);
+      outdata += color_sz;
     } 
     else 
     {
@@ -278,9 +293,10 @@ gst_realsense_src_create_buffer_from_frameset (GstRealsenseSrc * src, rs2::frame
       GST_LOG_OBJECT (src, "Image strides not identical, copy will be slower.");
       for (i = 0; i < src->height; i++) 
       {
-        memcpy (minfo.data + i * src->gst_stride,
-            ((guint8 *) cframe.get_data()) +
-            i * rs_stride, rs_stride);
+        memcpy (outdata,
+            ((guint8 *) cframe.get_data()) + i * rs_stride, 
+            rs_stride);
+        outdata += src->gst_stride;
       }
     }
 
@@ -288,16 +304,18 @@ gst_realsense_src_create_buffer_from_frameset (GstRealsenseSrc * src, rs2::frame
     // separate RGB and Depth, or consuming elements can do this themselves
     if(src->stream_type == StreamType::StreamMux)
     {
-      memcpy(minfo.data + color_sz, depth.get_data(), depth_sz);
+
+      memcpy(outdata, depth.get_data(), depth_sz);
     }
   }
   else //implied src->stream_type == StreamType::Depth
   {
     rs_stride = depth.get_stride_in_bytes();
       /* TODO: use orc_memcpy */
+    auto outdata = minfo.data + sizeof(RSHeader);
     if (src->gst_stride == rs_stride) 
     {
-      memcpy (minfo.data, ((guint8 *) depth.get_data()), depth_sz);
+      memcpy (outdata, ((guint8 *) depth.get_data()), depth_sz);
     } 
     else 
     {
@@ -305,9 +323,10 @@ gst_realsense_src_create_buffer_from_frameset (GstRealsenseSrc * src, rs2::frame
       GST_LOG_OBJECT (src, "Image strides not identical, copy will be slower.");
       for (i = 0; i < src->height; i++) 
       {
-        memcpy (minfo.data + i * src->gst_stride,
-            ((guint8 *) depth.get_data()) +
-            i * rs_stride, rs_stride);
+        memcpy (outdata,
+            ((guint8 *) depth.get_data()) + i * rs_stride,
+            rs_stride);
+        minfo.data += src->gst_stride;
       }
     }
   }
@@ -633,7 +652,7 @@ realsensesrc_init (GstPlugin * realsensesrc)
   GST_DEBUG_CATEGORY_INIT (gst_realsense_src_debug, "realsensesrc",
       0, "Template realsensesrc");
 
-  if (!gst_element_register (realsensesrc, "dvdemux", GST_RANK_MARGINAL,
+  if (!gst_element_register (realsensesrc, "rsdemux", GST_RANK_MARGINAL,
       GST_TYPE_RSDEMUX))
     return FALSE;
 
