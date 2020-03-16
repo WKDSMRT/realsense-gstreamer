@@ -1008,24 +1008,37 @@ RSHeader GetRSHeader(GstRSDemux* src, GstBuffer* buffer)
 
   gst_element_post_message(GST_ELEMENT_CAST(src), 
           gst_message_new_info(GST_OBJECT_CAST(src), NULL, "extracting header"));
+#if 1
+  RSHeader header;
+  RSHeader* in;
+  GstMapInfo map;
+  gst_buffer_map(buffer, &map, GST_MAP_READ);
+  in = reinterpret_cast<RSHeader*>(map.data);
+  // memcpy(&header, map.data, sizeof(RSHeader));
 
-  // GstMapInfo map;
-  // gst_buffer_map(buffer, &map, GST_MAP_READ);
-
+  header.color_height = in->color_height;
+  header.color_width = in->color_width;
+  header.color_stride = in->color_stride;
+  header.color_format = in->color_format;
+  header.depth_height = in->depth_height;
+  header.depth_width = in->depth_width;
+  header.depth_stride = in->depth_stride;
+  header.depth_format = in->depth_format;
+  
+  gst_buffer_unmap(buffer, &map);
+#else
   RSHeader header{
     720,
     1280,
-    1280,
+    3840,
     GST_VIDEO_FORMAT_RGB,
     480,
     848,
-    848,
+    1696,
     GST_VIDEO_FORMAT_GRAY16_LE
   };
-  
-  // memcpy(&header, map.data, sizeof(RSHeader));
+#endif
 
-  // gst_buffer_unmap(buffer, &map);
 
   return header;
 }
@@ -1115,18 +1128,24 @@ gst_rsdemux_demux_video (GstRSDemux * rsdemux, GstBuffer * buffer)//,guint64 dur
   // outbuf = gst_buffer_make_writable (buffer);
   GstMapInfo inmap, cmap, dmap;
   gst_buffer_map(buffer, &inmap, GST_MAP_READ);
+  
+  gst_element_post_message(GST_ELEMENT_CAST(rsdemux), 
+        gst_message_new_info(GST_OBJECT_CAST(rsdemux), NULL, "copying color buffer to src pad"));
 
-  auto color_sz = header.color_height * header.color_stride * 3; // FIXME use element size instead of hardcoded number
+  auto color_sz = header.color_height * header.color_stride;
   auto colorbuf = gst_buffer_new_and_alloc( color_sz);
   gst_buffer_map(colorbuf, &cmap, GST_MAP_WRITE);
   auto cdata = inmap.data + sizeof(RSHeader);
   memcpy(cmap.data, cdata, color_sz);
 
-  auto depth_sz = header.depth_height * header.depth_stride * 2; // FIXME use element size instead of hardcoded number
+  gst_element_post_message(GST_ELEMENT_CAST(rsdemux), 
+        gst_message_new_info(GST_OBJECT_CAST(rsdemux), NULL, "copying depth buffer to src pad"));
+
+  auto depth_sz = header.depth_height * header.depth_stride;
   auto depthbuf = gst_buffer_new_and_alloc( depth_sz);
-  gst_buffer_map(colorbuf, &dmap, GST_MAP_WRITE);
+  gst_buffer_map(depthbuf, &dmap, GST_MAP_WRITE);
   auto ddata = cdata + color_sz;
-  memcpy(dmap.data, ddata, color_sz);
+  memcpy(dmap.data, ddata, depth_sz);
 
   // TODO What is duration? some sort of timestamp?
   // GST_BUFFER_DURATION (outbuf) = duration;
