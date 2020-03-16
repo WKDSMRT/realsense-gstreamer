@@ -173,7 +173,6 @@ static gboolean gst_rsdemux_handle_sink_event (GstPad * pad, GstObject * parent,
     GstEvent * event);
 
 /* scheduling functions */
-static void gst_rsdemux_loop (GstPad * pad);
 static GstFlowReturn gst_rsdemux_flush (GstRSDemux * rsdemux);
 static GstFlowReturn gst_rsdemux_flush_buffer (GstRSDemux * rsdemux, GstBuffer* buffer);
 static GstFlowReturn gst_rsdemux_chain (GstPad * pad, GstObject * parent,
@@ -216,8 +215,6 @@ gst_rsdemux_class_init (GstRSDemuxClass * klass)
 static void
 gst_rsdemux_init (GstRSDemux * rsdemux)
 {
-  gint i;
-
   rsdemux->sinkpad = gst_pad_new_from_static_template (&sink_tmpl, "sink");
   /* we can operate in pull and push mode so we install
    * a custom activate function */
@@ -306,27 +303,27 @@ have_group_id (GstRSDemux * demux)
   return demux->have_group_id;
 }
 
-static GstEvent *
-gst_rsdemux_create_global_tag_event (GstRSDemux * rsdemux)
-{
-  gchar rec_datetime[40];
-  GstDateTime *rec_dt;
-  GstTagList *tags;
+// static GstEvent *
+// gst_rsdemux_create_global_tag_event (GstRSDemux * rsdemux)
+// {
+//   gchar rec_datetime[40];
+//   GstDateTime *rec_dt;
+//   GstTagList *tags;
 
-  tags = gst_tag_list_new (GST_TAG_CONTAINER_FORMAT, "RS", NULL);
-  gst_tag_list_set_scope (tags, GST_TAG_SCOPE_GLOBAL);
+//   tags = gst_tag_list_new (GST_TAG_CONTAINER_FORMAT, "RS", NULL);
+//   gst_tag_list_set_scope (tags, GST_TAG_SCOPE_GLOBAL);
 
-//   if (dv_get_recording_datetime (rsdemux->decoder, rec_datetime)) {
-//     rec_dt = gst_date_time_new_from_iso8601_string (rec_datetime);
-//     if (rec_dt) {
-//       gst_tag_list_add (tags, GST_TAG_MERGE_REPLACE, GST_TAG_DATE_TIME,
-//           rec_dt, NULL);
-//       gst_date_time_unref (rec_dt);
-//     }
-//   }
+// //   if (dv_get_recording_datetime (rsdemux->decoder, rec_datetime)) {
+// //     rec_dt = gst_date_time_new_from_iso8601_string (rec_datetime);
+// //     if (rec_dt) {
+// //       gst_tag_list_add (tags, GST_TAG_MERGE_REPLACE, GST_TAG_DATE_TIME,
+// //           rec_dt, NULL);
+// //       gst_date_time_unref (rec_dt);
+// //     }
+// //   }
 
-  return gst_event_new_tag (tags);
-}
+//   return gst_event_new_tag (tags);
+// }
 
 static GstPad *
 gst_rsdemux_add_pad (GstRSDemux * rsdemux, GstStaticPadTemplate * templ, GstCaps * caps)
@@ -359,9 +356,9 @@ gst_rsdemux_add_pad (GstRSDemux * rsdemux, GstStaticPadTemplate * templ, GstCaps
 
   gst_element_add_pad (GST_ELEMENT (rsdemux), pad);
 
-  if (!rsdemux->tag_event) {
-    rsdemux->tag_event = gst_rsdemux_create_global_tag_event (rsdemux);
-  }
+  // if (!rsdemux->tag_event) {
+  //   rsdemux->tag_event = gst_rsdemux_create_global_tag_event (rsdemux);
+  // }
 
   if (rsdemux->tag_event) {
     gst_pad_push_event (pad, gst_event_ref (rsdemux->tag_event));
@@ -527,13 +524,13 @@ gst_rsdemux_sink_convert (GstRSDemux * rsdemux, GstFormat src_format,
       switch (dest_format) {
         case GST_FORMAT_TIME:
         {
-          guint64 frame;
+          // guint64 frame;
 
           /* get frame number, rounds down so don't combine this
            * line and the next line. */
-          frame = src_value / rsdemux->frame_len;
+          // frame = src_value / rsdemux->frame_len;
 
-          break;
+          // break;
         }
         default:
           res = FALSE;
@@ -543,9 +540,7 @@ gst_rsdemux_sink_convert (GstRSDemux * rsdemux, GstFormat src_format,
       switch (dest_format) {
         case GST_FORMAT_BYTES:
         {
-
-
-          break;
+          // break;
         }
         default:
           res = FALSE;
@@ -572,105 +567,105 @@ static gboolean
 gst_rsdemux_src_query (GstPad * pad, GstObject * parent, GstQuery * query)
 {
   gboolean res = TRUE;
-  GstRSDemux *rsdemux = GST_RSDEMUX (parent);
+  // GstRSDemux *rsdemux = GST_RSDEMUX (parent);
 
   switch (GST_QUERY_TYPE (query)) {
     case GST_QUERY_DURATION:
     {
-      GstFormat format;
-      gint64 end;
-      GstQuery *pquery;
+      // GstFormat format;
+      // gint64 end;
+      // GstQuery *pquery;
 
-      /* First ask the peer in the original format */
-      if (!gst_pad_peer_query (rsdemux->sinkpad, query)) {
-        /* get target format */
-        gst_query_parse_duration (query, &format, NULL);
+      // /* First ask the peer in the original format */
+      // if (!gst_pad_peer_query (rsdemux->sinkpad, query)) {
+      //   /* get target format */
+      //   gst_query_parse_duration (query, &format, NULL);
 
-        /* Now ask the peer in BYTES format and try to convert */
-        pquery = gst_query_new_duration (GST_FORMAT_BYTES);
-        if (!gst_pad_peer_query (rsdemux->sinkpad, pquery)) {
-          gst_query_unref (pquery);
-          goto error;
-        }
+      //   /* Now ask the peer in BYTES format and try to convert */
+      //   pquery = gst_query_new_duration (GST_FORMAT_BYTES);
+      //   if (!gst_pad_peer_query (rsdemux->sinkpad, pquery)) {
+      //     gst_query_unref (pquery);
+      //     goto error;
+      //   }
 
-        /* get peer total length */
-        gst_query_parse_duration (pquery, NULL, &end);
-        gst_query_unref (pquery);
+      //   /* get peer total length */
+      //   gst_query_parse_duration (pquery, NULL, &end);
+      //   gst_query_unref (pquery);
 
-        /* convert end to requested format */
-        if (end != -1) {
-          if (!(res = gst_rsdemux_sink_convert (rsdemux,
-                      GST_FORMAT_BYTES, end, format, &end))) {
-            goto error;
-          }
-          gst_query_set_duration (query, format, end);
-        }
-      }
-      break;
+      //   /* convert end to requested format */
+      //   if (end != -1) {
+      //     if (!(res = gst_rsdemux_sink_convert (rsdemux,
+      //                 GST_FORMAT_BYTES, end, format, &end))) {
+      //       goto error;
+      //     }
+      //     gst_query_set_duration (query, format, end);
+      //   }
+      // }
+      // break;
     }
     case GST_QUERY_CONVERT:
     {
-      GstFormat src_fmt, dest_fmt;
-      gint64 src_val, dest_val;
+      // GstFormat src_fmt, dest_fmt;
+      // gint64 src_val, dest_val;
 
-      gst_query_parse_convert (query, &src_fmt, &src_val, &dest_fmt, &dest_val);
-      if (!(res =
-              gst_rsdemux_src_convert (rsdemux, pad, src_fmt, src_val,
-                  dest_fmt, &dest_val)))
-        goto error;
-      gst_query_set_convert (query, src_fmt, src_val, dest_fmt, dest_val);
-      break;
+      // gst_query_parse_convert (query, &src_fmt, &src_val, &dest_fmt, &dest_val);
+      // if (!(res =
+      //         gst_rsdemux_src_convert (rsdemux, pad, src_fmt, src_val,
+      //             dest_fmt, &dest_val)))
+      //   goto error;
+      // gst_query_set_convert (query, src_fmt, src_val, dest_fmt, dest_val);
+      // break;
     }
     case GST_QUERY_SEEKING:
     {
-      GstFormat fmt;
-      GstQuery *peerquery;
-      gboolean seekable;
+      // GstFormat fmt;
+      // GstQuery *peerquery;
+      // gboolean seekable;
 
-      gst_query_parse_seeking (query, &fmt, NULL, NULL, NULL);
+      // gst_query_parse_seeking (query, &fmt, NULL, NULL, NULL);
 
-      /* We can only handle TIME seeks really */
-      if (fmt != GST_FORMAT_TIME) {
-        gst_query_set_seeking (query, fmt, FALSE, -1, -1);
-        break;
-      }
+      // /* We can only handle TIME seeks really */
+      // if (fmt != GST_FORMAT_TIME) {
+      //   gst_query_set_seeking (query, fmt, FALSE, -1, -1);
+      //   break;
+      // }
 
-      /* First ask upstream */
-      if (gst_pad_peer_query (rsdemux->sinkpad, query)) {
-        gst_query_parse_seeking (query, NULL, &seekable, NULL, NULL);
-        if (seekable) {
-          res = TRUE;
-          break;
-        }
-      }
+      // /* First ask upstream */
+      // if (gst_pad_peer_query (rsdemux->sinkpad, query)) {
+      //   gst_query_parse_seeking (query, NULL, &seekable, NULL, NULL);
+      //   if (seekable) {
+      //     res = TRUE;
+      //     break;
+      //   }
+      // }
 
-      res = TRUE;
+      // res = TRUE;
 
-      peerquery = gst_query_new_seeking (GST_FORMAT_BYTES);
-      seekable = gst_pad_peer_query (rsdemux->sinkpad, peerquery);
+      // peerquery = gst_query_new_seeking (GST_FORMAT_BYTES);
+      // seekable = gst_pad_peer_query (rsdemux->sinkpad, peerquery);
 
-      if (seekable)
-        gst_query_parse_seeking (peerquery, NULL, &seekable, NULL, NULL);
-      gst_query_unref (peerquery);
+      // if (seekable)
+      //   gst_query_parse_seeking (peerquery, NULL, &seekable, NULL, NULL);
+      // gst_query_unref (peerquery);
 
-      if (seekable) {
-        peerquery = gst_query_new_duration (GST_FORMAT_TIME);
-        seekable = gst_rsdemux_src_query (pad, parent, peerquery);
+      // if (seekable) {
+      //   peerquery = gst_query_new_duration (GST_FORMAT_TIME);
+      //   seekable = gst_rsdemux_src_query (pad, parent, peerquery);
 
-        if (seekable) {
-          gint64 duration;
+      //   if (seekable) {
+      //     gint64 duration;
 
-          gst_query_parse_duration (peerquery, NULL, &duration);
-          gst_query_set_seeking (query, GST_FORMAT_TIME, seekable, 0, duration);
-        } else {
-          gst_query_set_seeking (query, GST_FORMAT_TIME, FALSE, -1, -1);
-        }
+      //     gst_query_parse_duration (peerquery, NULL, &duration);
+      //     gst_query_set_seeking (query, GST_FORMAT_TIME, seekable, 0, duration);
+      //   } else {
+      //     gst_query_set_seeking (query, GST_FORMAT_TIME, FALSE, -1, -1);
+      //   }
 
-        gst_query_unref (peerquery);
-      } else {
-        gst_query_set_seeking (query, GST_FORMAT_TIME, FALSE, -1, -1);
-      }
-      break;
+      //   gst_query_unref (peerquery);
+      // } else {
+      //   gst_query_set_seeking (query, GST_FORMAT_TIME, FALSE, -1, -1);
+      // }
+      // break;
     }
     default:
       res = gst_pad_query_default (pad, parent, query);
@@ -680,11 +675,11 @@ gst_rsdemux_src_query (GstPad * pad, GstObject * parent, GstQuery * query)
   return res;
 
   /* ERRORS */
-error:
-  {
-    GST_DEBUG ("error source query");
-    return FALSE;
-  }
+// error:
+//   {
+//     GST_DEBUG ("error source query");
+//     return FALSE;
+//   }
 }
 
 static gboolean
@@ -698,16 +693,16 @@ gst_rsdemux_sink_query (GstPad * pad, GstObject * parent, GstQuery * query)
   switch (GST_QUERY_TYPE (query)) {
     case GST_QUERY_CONVERT:
     {
-      GstFormat src_fmt, dest_fmt;
-      gint64 src_val, dest_val;
+      // GstFormat src_fmt, dest_fmt;
+      // gint64 src_val, dest_val;
 
-      gst_query_parse_convert (query, &src_fmt, &src_val, &dest_fmt, &dest_val);
-      if (!(res =
-              gst_rsdemux_sink_convert (rsdemux, src_fmt, src_val, dest_fmt,
-                  &dest_val)))
-        goto error;
-      gst_query_set_convert (query, src_fmt, src_val, dest_fmt, dest_val);
-      break;
+      // gst_query_parse_convert (query, &src_fmt, &src_val, &dest_fmt, &dest_val);
+      // if (!(res =
+      //         gst_rsdemux_sink_convert (rsdemux, src_fmt, src_val, dest_fmt,
+      //             &dest_val)))
+      //   goto error;
+      // gst_query_set_convert (query, src_fmt, src_val, dest_fmt, dest_val);
+      // break;
     }
     default:
       res = gst_pad_query_default (pad, parent, query);
@@ -717,11 +712,11 @@ gst_rsdemux_sink_query (GstPad * pad, GstObject * parent, GstQuery * query)
   return res;
 
   /* ERRORS */
-error:
-  {
-    GST_DEBUG ("error handling sink query");
-    return FALSE;
-  }
+// error:
+//   {
+//     GST_DEBUG ("error handling sink query");
+//     return FALSE;
+//   }
 }
 
 /* takes ownership of the event */
@@ -846,30 +841,30 @@ done:
 /* convert a pair of values on the srcpad to a pair of
  * values on the sinkpad 
  */
-static gboolean
-gst_rsdemux_convert_src_to_sink (GstRSDemux * rsdemux, GstPad * pad,
-    GstFormat src_format, gint64 src_start, gint64 src_stop,
-    GstFormat dst_format, gint64 * dst_start, gint64 * dst_stop)
-{
-  GstFormat conv;
-  gboolean res;
+// static gboolean
+// gst_rsdemux_convert_src_to_sink (GstRSDemux * rsdemux, GstPad * pad,
+//     GstFormat src_format, gint64 src_start, gint64 src_stop,
+//     GstFormat dst_format, gint64 * dst_start, gint64 * dst_stop)
+// {
+//   GstFormat conv;
+//   gboolean res;
 
-  conv = GST_FORMAT_TIME;
-  /* convert to TIME intermediate format */
-  if (!(res = gst_rsdemux_convert_src_pair (rsdemux, pad,
-              src_format, src_start, src_stop, conv, dst_start, dst_stop))) {
-    /* could not convert format to time offset */
-    goto done;
-  }
-  /* convert to dst format on sinkpad */
-  if (!(res = gst_rsdemux_convert_sink_pair (rsdemux,
-              conv, *dst_start, *dst_stop, dst_format, dst_start, dst_stop))) {
-    /* could not convert format to time offset */
-    goto done;
-  }
-done:
-  return res;
-}
+//   conv = GST_FORMAT_TIME;
+//   /* convert to TIME intermediate format */
+//   if (!(res = gst_rsdemux_convert_src_pair (rsdemux, pad,
+//               src_format, src_start, src_stop, conv, dst_start, dst_stop))) {
+//     /* could not convert format to time offset */
+//     goto done;
+//   }
+//   /* convert to dst format on sinkpad */
+//   if (!(res = gst_rsdemux_convert_sink_pair (rsdemux,
+//               conv, *dst_start, *dst_stop, dst_format, dst_start, dst_stop))) {
+//     /* could not convert format to time offset */
+//     goto done;
+//   }
+// done:
+//   return res;
+// }
 
 #if 0
 static gboolean
@@ -890,44 +885,44 @@ gst_rsdemux_convert_segment (Gstrsdemux * rsdemux, GstSegment * src,
  * upstream
  * Does not take ownership of the event.
  */
-static gboolean
-gst_rsdemux_handle_push_seek (GstRSDemux * rsdemux, GstPad * pad,
-    GstEvent * event)
-{
-  gboolean res = FALSE;
-  gdouble rate;
-  GstSeekFlags flags;
-  GstFormat format;
-  GstSeekType cur_type, stop_type;
-  gint64 cur, stop;
-  gint64 start_position, end_position;
-  GstEvent *newevent;
+// static gboolean
+// gst_rsdemux_handle_push_seek (GstRSDemux * rsdemux, GstPad * pad,
+//     GstEvent * event)
+// {
+//   gboolean res = FALSE;
+//   gdouble rate;
+//   GstSeekFlags flags;
+//   GstFormat format;
+//   GstSeekType cur_type, stop_type;
+//   gint64 cur, stop;
+//   gint64 start_position, end_position;
+//   GstEvent *newevent;
 
-  gst_event_parse_seek (event, &rate, &format, &flags,
-      &cur_type, &cur, &stop_type, &stop);
+//   gst_event_parse_seek (event, &rate, &format, &flags,
+//       &cur_type, &cur, &stop_type, &stop);
 
-  /* First try if upstream can handle time based seeks */
-  if (format == GST_FORMAT_TIME)
-    res = gst_pad_push_event (rsdemux->sinkpad, gst_event_ref (event));
+//   /* First try if upstream can handle time based seeks */
+//   if (format == GST_FORMAT_TIME)
+//     res = gst_pad_push_event (rsdemux->sinkpad, gst_event_ref (event));
 
-  if (!res) {
-    /* we convert the start/stop on the srcpad to the byte format
-     * on the sinkpad and forward the event */
-    res = gst_rsdemux_convert_src_to_sink (rsdemux, pad,
-        format, cur, stop, GST_FORMAT_BYTES, &start_position, &end_position);
-    if (!res)
-      goto done;
+//   if (!res) {
+//     /* we convert the start/stop on the srcpad to the byte format
+//      * on the sinkpad and forward the event */
+//     res = gst_rsdemux_convert_src_to_sink (rsdemux, pad,
+//         format, cur, stop, GST_FORMAT_BYTES, &start_position, &end_position);
+//     if (!res)
+//       goto done;
 
-    /* now this is the updated seek event on bytes */
-    newevent = gst_event_new_seek (rate, GST_FORMAT_BYTES, flags,
-        cur_type, start_position, stop_type, end_position);
-    gst_event_set_seqnum (newevent, gst_event_get_seqnum (event));
+//     /* now this is the updated seek event on bytes */
+//     newevent = gst_event_new_seek (rate, GST_FORMAT_BYTES, flags,
+//         cur_type, start_position, stop_type, end_position);
+//     gst_event_set_seqnum (newevent, gst_event_get_seqnum (event));
 
-    res = gst_pad_push_event (rsdemux->sinkpad, newevent);
-  }
-done:
-  return res;
-}
+//     res = gst_pad_push_event (rsdemux->sinkpad, newevent);
+//   }
+// done:
+//   return res;
+// }
 
 #if PROBABLY_UNUSED
 static void
@@ -995,51 +990,109 @@ gst_rsdemux_handle_src_event (GstPad * pad, GstObject * parent,
     GstEvent * event)
 {
   gboolean res = FALSE;
-  GstRSDemux *rsdemux;
+  // GstRSDemux *rsdemux;
 
-  rsdemux = GST_RSDEMUX (parent);
+  // rsdemux = GST_RSDEMUX (parent);
 
-  switch (GST_EVENT_TYPE (event)) {
-    default:
-      res = gst_pad_push_event (rsdemux->sinkpad, event);
-      break;
-  }
+  // switch (GST_EVENT_TYPE (event)) {
+  //   default:
+  //     res = gst_pad_push_event (rsdemux->sinkpad, event);
+  //     break;
+  // }
 
   return res;
+  }
+
+RSHeader GetRSHeader(GstRSDemux* src, GstBuffer* buffer)
+{
+
+  gst_element_post_message(GST_ELEMENT_CAST(src), 
+          gst_message_new_info(GST_OBJECT_CAST(src), NULL, "extracting header"));
+
+  // GstMapInfo map;
+  // gst_buffer_map(buffer, &map, GST_MAP_READ);
+
+  RSHeader header{
+    720,
+    1280,
+    1280,
+    GST_VIDEO_FORMAT_RGB,
+    480,
+    848,
+    848,
+    GST_VIDEO_FORMAT_GRAY16_LE
+  };
+  
+  // memcpy(&header, map.data, sizeof(RSHeader));
+
+  // gst_buffer_unmap(buffer, &map);
+
+  return header;
 }
 
 /* takes ownership of buffer FIXME */
 static GstFlowReturn
-gst_rsdemux_demux_video (GstRSDemux * rsdemux, GstBuffer * buffer,
-    guint64 duration)
+gst_rsdemux_demux_video (GstRSDemux * rsdemux, GstBuffer * buffer)//,guint64 duration)
 {
+  // return GST_FLOW_OK;
   GstBuffer *outbuf;
-  gint height = 0;
-  gboolean wide;
   GstFlowReturn ret = GST_FLOW_OK;
-
+  GstCaps* caps;
+  // GST_DEBUG ("Demuxing video frame");
+  
   /* get params */
   /* framerate is already up-to-date */
   
   // auto height = rsdemux->decoder->height;
   // wide = dv_format_wide (rsdemux->decoder);
-
+  const auto header = GetRSHeader(rsdemux, buffer);
   // see if anything changed 
-  if (G_UNLIKELY (rsdemux->colorsrcpad == NULL) || (rsdemux->in_height != height))   // || rsdemux->in_stride_bytes != in_bytes)) 
+  if (G_UNLIKELY (rsdemux->colorsrcpad == nullptr) || (rsdemux->in_stride_bytes != header.color_stride)) //|| (rsdemux->in_height != header.color_height))
   {
-    gint par_x, par_y;
+    // gint par_x, par_y;
 
-    rsdemux->in_height = height;
+    // rsdemux->in_height = height;
+    rsdemux->in_stride_bytes = header.color_stride;
     
-    auto color_caps = gst_caps_new_simple("video/x-raw", 
-      GST_VIDEO_CAPS_MAKE("{ RGB, RGBA, BGR, BGRA, GRAY16_LE, GRAY16_BE, YVYU }")
-    );
-    auto depth_caps = gst_caps_new_simple("video/x-raw", 
-      GST_VIDEO_CAPS_MAKE("{ GRAY16_LE, GRAY16_BE }")
-    );
+      
+    caps = gst_caps_new_simple ("video/x-dv",
+      "systemstream", G_TYPE_BOOLEAN, FALSE,
+      "width", G_TYPE_INT, 720,
+      "height", G_TYPE_INT, 480,
+      "framerate", GST_TYPE_FRACTION, 10, 30,
+      "pixel-aspect-ratio", GST_TYPE_FRACTION, 4, 3, NULL);
 
-    if (G_UNLIKELY (rsdemux->colorsrcpad == NULL) || G_UNLIKELY(rsdemux->depthsrcpad==NULL)) 
+    gst_element_post_message(GST_ELEMENT_CAST(rsdemux), 
+      gst_message_new_info(GST_OBJECT_CAST(rsdemux), NULL, "making pad caps"));
+
+    // auto color_caps = gst_caps_new_simple("video/x-raw", 
+    //   GST_VIDEO_CAPS_MAKE("{ RGB, RGBA, BGR, BGRA, GRAY16_LE, GRAY16_BE, YVYU }"),
+    //   NULL
+    // );
+    //     auto depth_caps = gst_caps_new_simple("video/x-raw", 
+    //   GST_VIDEO_CAPS_MAKE("{ GRAY16_LE, GRAY16_BE }"),
+    //   NULL
+    // );
+    auto color_caps = gst_caps_new_simple ("video/x-raw",
+          "format", G_TYPE_STRING, "RGB",
+          "width", G_TYPE_INT, header.color_width,
+          "height", G_TYPE_INT, header.color_height,
+          "framerate", GST_TYPE_FRACTION, 30, 1,
+          NULL);
+    auto depth_caps = gst_caps_new_simple ("video/x-raw",
+          "format", G_TYPE_STRING, "GRAY16_LE",
+          "width", G_TYPE_INT, header.depth_width,
+          "height", G_TYPE_INT, header.depth_height,
+          "framerate", GST_TYPE_FRACTION, 30, 1,
+          NULL);
+
+    gst_element_post_message(GST_ELEMENT_CAST(rsdemux), 
+      gst_message_new_info(GST_OBJECT_CAST(rsdemux), NULL, "made pad caps"));
+    if (G_UNLIKELY (rsdemux->colorsrcpad == nullptr) || G_UNLIKELY(rsdemux->depthsrcpad==nullptr)) 
     {
+      gst_element_post_message(GST_ELEMENT_CAST(rsdemux), 
+        gst_message_new_info(GST_OBJECT_CAST(rsdemux), NULL, "adding pads"));
+
       rsdemux->colorsrcpad = gst_rsdemux_add_pad (rsdemux, &color_src_tmpl, color_caps);
       rsdemux->depthsrcpad = gst_rsdemux_add_pad (rsdemux, &depth_src_tmpl, depth_caps);
 
@@ -1063,22 +1116,20 @@ gst_rsdemux_demux_video (GstRSDemux * rsdemux, GstBuffer * buffer,
   GstMapInfo inmap, cmap, dmap;
   gst_buffer_map(buffer, &inmap, GST_MAP_READ);
 
-  auto header = (RSHeader*)inmap.data;
-
-  auto color_sz = header->color_height * header->color_stride;
+  auto color_sz = header.color_height * header.color_stride;
   auto colorbuf = gst_buffer_new_and_alloc( color_sz);
   gst_buffer_map(colorbuf, &cmap, GST_MAP_WRITE);
   auto cdata = inmap.data + sizeof(RSHeader);
   memcpy(cmap.data, cdata, color_sz);
 
-  auto depth_sz = header->depth_height * header->depth_stride;
+  auto depth_sz = header.depth_height * header.depth_stride;
   auto depthbuf = gst_buffer_new_and_alloc( depth_sz);
   gst_buffer_map(colorbuf, &dmap, GST_MAP_WRITE);
   auto ddata = cdata + color_sz;
   memcpy(dmap.data, ddata, color_sz);
 
-  // TODO What is duration?
-  GST_BUFFER_DURATION (outbuf) = duration;
+  // TODO What is duration? some sort of timestamp?
+  // GST_BUFFER_DURATION (outbuf) = duration;
 
   if (rsdemux->new_media)// || rsdemux->discont)
     GST_BUFFER_FLAG_SET (outbuf, GST_BUFFER_FLAG_DISCONT);
@@ -1086,7 +1137,10 @@ gst_rsdemux_demux_video (GstRSDemux * rsdemux, GstBuffer * buffer,
   gst_buffer_unmap(buffer, &inmap);
   gst_buffer_unmap(colorbuf, &cmap);
   gst_buffer_unmap(depthbuf, &dmap);
-
+  
+  gst_element_post_message(GST_ELEMENT_CAST(rsdemux), 
+    gst_message_new_info(GST_OBJECT_CAST(rsdemux), NULL, "adding pads"));
+        
   ret = gst_pad_push (rsdemux->colorsrcpad, colorbuf);
   ret = gst_pad_push (rsdemux->depthsrcpad, depthbuf);
 #if PROBABLY_UNUSED
@@ -1095,80 +1149,91 @@ gst_rsdemux_demux_video (GstRSDemux * rsdemux, GstBuffer * buffer,
   return ret;
 }
 
-static gboolean
-gst_rsdemux_is_new_media (GstRSDemux * rsdemux, GstBuffer * buffer)
-{
-  guint8 *data;
-  GstMapInfo map;
-  int aaux_offset;
-  int dif;
-  int n_difs;
+// static gboolean
+// gst_rsdemux_is_new_media (GstRSDemux * rsdemux, GstBuffer * buffer)
+// {
+//   guint8 *data;
+//   GstMapInfo map;
+//   int aaux_offset;
+//   int dif;
+//   int n_difs;
 
-//   n_difs = rsdemux->decoder->num_dif_seqs;
+// //   n_difs = rsdemux->decoder->num_dif_seqs;
 
-  gst_buffer_map (buffer, &map, GST_MAP_READ);
-  data = map.data;
-  for (dif = 0; dif < n_difs; dif++) {
-    if (dif & 1) {
-      aaux_offset = (dif * 12000) + (6 + 16 * 1) * 80 + 3;
-    } else {
-      aaux_offset = (dif * 12000) + (6 + 16 * 4) * 80 + 3;
-    }
-    if (data[aaux_offset + 0] == 0x51) {
-      if ((data[aaux_offset + 2] & 0x80) == 0) {
-        gst_buffer_unmap (buffer, &map);
-        return TRUE;
-      }
-    }
-  }
+//   gst_buffer_map (buffer, &map, GST_MAP_READ);
+//   data = map.data;
+//   for (dif = 0; dif < n_difs; dif++) {
+//     if (dif & 1) {
+//       aaux_offset = (dif * 12000) + (6 + 16 * 1) * 80 + 3;
+//     } else {
+//       aaux_offset = (dif * 12000) + (6 + 16 * 4) * 80 + 3;
+//     }
+//     if (data[aaux_offset + 0] == 0x51) {
+//       if ((data[aaux_offset + 2] & 0x80) == 0) {
+//         gst_buffer_unmap (buffer, &map);
+//         return TRUE;
+//       }
+//     }
+//   }
 
-  gst_buffer_unmap (buffer, &map);
-  return FALSE;
-}
+//   gst_buffer_unmap (buffer, &map);
+//   return FALSE;
+// }
+#include <stdexcept>
 
 /* takes ownership of buffer */
 static GstFlowReturn
 gst_rsdemux_demux_frame (GstRSDemux * rsdemux, GstBuffer * buffer)
 {
-  GstClockTime next_ts;
-  GstFlowReturn aret, vret, ret;
-  GstMapInfo map;
-  guint64 duration;
-  int frame_number;
+  // GstClockTime next_ts;
+  GstFlowReturn vret, ret;
+  // GstMapInfo map;
+  // guint64 duration;
+  // int frame_number;
 
-  gst_buffer_map (buffer, &map, GST_MAP_READ);
+  // gst_buffer_map (buffer, &map, GST_MAP_READ);
 //   dv_parse_packs (rsdemux->decoder, map.data);
-  gst_buffer_unmap (buffer, &map);
-  rsdemux->new_media = FALSE;
-  if (gst_rsdemux_is_new_media (rsdemux, buffer) &&
-      rsdemux->frames_since_new_media > 2) {
-    rsdemux->new_media = TRUE;
-    rsdemux->frames_since_new_media = 0;
-  }
-  rsdemux->frames_since_new_media++;
-
+  // gst_buffer_unmap (buffer, &map);
+  // rsdemux->new_media = FALSE;
+  // if (gst_rsdemux_is_new_media (rsdemux, buffer) &&
+  //     rsdemux->frames_since_new_media > 2) {
+  //   rsdemux->new_media = TRUE;
+  //   rsdemux->frames_since_new_media = 0;
+  // }
+  // rsdemux->frames_since_new_media++;
+  rsdemux->frame_count++;
+  
+  gst_element_post_message(GST_ELEMENT_CAST(rsdemux), 
+            gst_message_new_info(GST_OBJECT_CAST(rsdemux), NULL, "demuxing frame"));
+  // GST_DEBUG_OBJECT (rsdemux, "%s", __FUNCTION__);
   /* takes ownership of buffer */
-  vret = ret = gst_rsdemux_demux_video (rsdemux, buffer, duration);
-  if (G_UNLIKELY (ret != GST_FLOW_OK && ret != GST_FLOW_NOT_LINKED))
-    goto done;
-
-  /* if both are not linked, we stop */
-  if (G_UNLIKELY (aret == GST_FLOW_NOT_LINKED && vret == GST_FLOW_NOT_LINKED)) {
-    ret = GST_FLOW_NOT_LINKED;
-    goto done;
+  try 
+  {
+    vret = ret = gst_rsdemux_demux_video (rsdemux, buffer);
+    if (G_UNLIKELY (ret != GST_FLOW_OK && ret != GST_FLOW_NOT_LINKED))
+      throw new std::runtime_error("gst_rsdemux_demux_video failed"); //goto done;
+    
+    
+    /* if both are not linked, we stop */
+    if (G_UNLIKELY (vret == GST_FLOW_NOT_LINKED)) {
+          ret = GST_FLOW_NOT_LINKED;
+    }
+      // goto done;
   }
-
-
-done:
+  catch(const std::exception& e)
+  {
+    GST_ELEMENT_ERROR (rsdemux, RESOURCE, FAILED, ("gst_rsdemux_demux_frame: %s", e.what()), (NULL));
+  }
+// done:
   return ret;
 
   /* ERRORS */
-segment_error:
-  {
-    GST_DEBUG ("error generating new_segment event");
-    gst_buffer_unref (buffer);
-    return GST_FLOW_ERROR;
-  }
+// segment_error:
+//   {
+//     GST_DEBUG ("error generating new_segment event");
+//     gst_buffer_unref (buffer);
+//     return GST_FLOW_ERROR;
+//   }
 }
 
 /* flush any remaining data in the adapter, used in chain based scheduling mode */
@@ -1222,12 +1287,12 @@ done:
   return ret;
 
   /* ERRORS */
-parse_header_error:
-  {
-    GST_ELEMENT_ERROR (rsdemux, STREAM, DECODE,
-        (NULL), ("Error parsing header"));
-    return GST_FLOW_ERROR;
-  }
+// parse_header_error:
+//   {
+//     GST_ELEMENT_ERROR (rsdemux, STREAM, DECODE,
+//         (NULL), ("Error parsing header"));
+//     return GST_FLOW_ERROR;
+//   }
 }
 
 /* flush any remaining data in the adapter, used in chain based scheduling mode */
@@ -1246,25 +1311,14 @@ static GstFlowReturn
 gst_rsdemux_chain (GstPad * pad, GstObject * parent, GstBuffer * buffer)
 {
   GstFlowReturn ret;
-  GstClockTime timestamp;
+  // GstClockTime timestamp;
   // GstRSDemux *rsdemux;
   auto rsdemux = GST_RSDEMUX (parent);
 
   // Probably don't need to deal with discontinuity
 
   /* a timestamp always should be respected */
-  timestamp = GST_BUFFER_TIMESTAMP (buffer);
-
-  /* Apparently dv_parse_header can read from the body of the frame
-   * too, so it needs more than header_size bytes. Wacky!
-   */
-  if (G_UNLIKELY (rsdemux->frame_len == -1)) {
-    /* FIXME: realsense can put out different size buffers 
-      if we don't know the length of a frame, we assume it is
-     * the NTSC_BUFFER length, as this is enough to figure out 
-     * if this is PAL or NTSC */
-    rsdemux->frame_len = NTSC_BUFFER;
-  }
+  // timestamp = GST_BUFFER_TIMESTAMP (buffer);
 
   /* and try to flush pending frames */
   ret = gst_rsdemux_flush_buffer (rsdemux, buffer);
@@ -1357,10 +1411,10 @@ gst_rsdemux_change_state (GstElement * element, GstStateChange transition)
       gst_adapter_clear (rsdemux->adapter);
       dv_decoder_free (rsdemux->decoder);
       rsdemux->decoder = NULL;
-
+    */
       gst_rsdemux_remove_pads (rsdemux);
 
-      if (rsdemux->tag_event) {
+    /*  if (rsdemux->tag_event) {
         gst_event_unref (rsdemux->tag_event);
         rsdemux->tag_event = NULL;
       }
@@ -1369,13 +1423,13 @@ gst_rsdemux_change_state (GstElement * element, GstStateChange transition)
     */
     case GST_STATE_CHANGE_READY_TO_NULL:
     {
-      GstEvent **event_p;
+      // GstEvent **event_p;
 
-      event_p = &rsdemux->seek_event;
-      gst_event_replace (event_p, NULL);
-      if (rsdemux->pending_segment)
-        gst_event_unref (rsdemux->pending_segment);
-      rsdemux->pending_segment = NULL;
+      // event_p = &rsdemux->seek_event;
+      // gst_event_replace (event_p, NULL);
+      // if (rsdemux->pending_segment)
+      //   gst_event_unref (rsdemux->pending_segment);
+      // rsdemux->pending_segment = NULL;
       break;
     }
     default:

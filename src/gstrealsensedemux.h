@@ -49,8 +49,8 @@ struct _GstRSDemux {
   GstElement     element;
 
   GstPad        *sinkpad;
-  GstPad        *colorsrcpad;
-  GstPad        *depthsrcpad;
+  GstPad        *colorsrcpad = nullptr;
+  GstPad        *depthsrcpad = nullptr;
 // TODO audio becomes IMU stream
 //   GstPad        *audiosrcpad; 
 
@@ -77,10 +77,10 @@ struct _GstRSDemux {
   gint           depth_height;
   gint           depth_width;
   gint           depth_stride_bytes;
+  gint           frame_count = 0;
 
 // TODO What do these values do? Are they needed?
   gint           frame_len;
-
 // Seem to be for seeking
   // GstDVDemuxSeekHandler seek_handler;
   // GstSegment     byte_segment;
