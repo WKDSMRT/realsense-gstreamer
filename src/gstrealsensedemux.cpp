@@ -1116,13 +1116,13 @@ gst_rsdemux_demux_video (GstRSDemux * rsdemux, GstBuffer * buffer)//,guint64 dur
   GstMapInfo inmap, cmap, dmap;
   gst_buffer_map(buffer, &inmap, GST_MAP_READ);
 
-  auto color_sz = header.color_height * header.color_stride;
+  auto color_sz = header.color_height * header.color_stride * 3; // FIXME use element size instead of hardcoded number
   auto colorbuf = gst_buffer_new_and_alloc( color_sz);
   gst_buffer_map(colorbuf, &cmap, GST_MAP_WRITE);
   auto cdata = inmap.data + sizeof(RSHeader);
   memcpy(cmap.data, cdata, color_sz);
 
-  auto depth_sz = header.depth_height * header.depth_stride;
+  auto depth_sz = header.depth_height * header.depth_stride * 2; // FIXME use element size instead of hardcoded number
   auto depthbuf = gst_buffer_new_and_alloc( depth_sz);
   gst_buffer_map(colorbuf, &dmap, GST_MAP_WRITE);
   auto ddata = cdata + color_sz;
@@ -1139,7 +1139,7 @@ gst_rsdemux_demux_video (GstRSDemux * rsdemux, GstBuffer * buffer)//,guint64 dur
   gst_buffer_unmap(depthbuf, &dmap);
   
   gst_element_post_message(GST_ELEMENT_CAST(rsdemux), 
-    gst_message_new_info(GST_OBJECT_CAST(rsdemux), NULL, "adding pads"));
+    gst_message_new_info(GST_OBJECT_CAST(rsdemux), NULL, "pushing buffers"));
         
   ret = gst_pad_push (rsdemux->colorsrcpad, colorbuf);
   ret = gst_pad_push (rsdemux->depthsrcpad, depthbuf);
