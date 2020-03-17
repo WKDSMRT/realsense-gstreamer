@@ -51,19 +51,9 @@ struct _GstRSDemux {
   GstPad        *sinkpad;
   GstPad        *colorsrcpad = nullptr;
   GstPad        *depthsrcpad = nullptr;
-// TODO audio becomes IMU stream
-//   GstPad        *audiosrcpad; 
-
-  gboolean       have_group_id;
-  guint          group_id;
 
 // TODO put encode/decode all in a single file/class
-//   dv_decoder_t  *decoder;
-
-//   GstAdapter    *adapter;
-// GstAdapter adapts streams of varying input sizes to constant frame size.
-// We shouldn't need it
-// https://developer.gnome.org/gstreamer-libs/stable/GstAdapter.html
+// dv_decoder_t  *decoder;
 
   /* video params */
   gint           in_height;
@@ -81,23 +71,9 @@ struct _GstRSDemux {
 
 // TODO What do these values do? Are they needed?
   gint           frame_len;
-// Seem to be for seeking
-  // GstDVDemuxSeekHandler seek_handler;
-  // GstSegment     byte_segment;
-  // gboolean       upstream_time_segment;
-  // GstSegment     time_segment;
-  // gboolean       need_segment;
-  // guint32        segment_seqnum;
 
   gboolean       new_media;
   int            frames_since_new_media;
-  
-  gint           found_header; /* ATOMIC */
-  GstEvent      *seek_event;
-  GstEvent	*pending_segment;
-  GstEvent      *tag_event;
-
-  gint16        *audio_buffers[4];
 };
 
 struct _GstRSDemuxClass 

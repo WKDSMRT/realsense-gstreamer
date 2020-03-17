@@ -245,18 +245,6 @@ gst_rsdemux_init (GstRSDemux * rsdemux)
 static void
 gst_rsdemux_finalize (GObject * object)
 {
-  GstRSDemux *rsdemux;
-  gint i;
-
-  rsdemux = GST_RSDEMUX (object);
-
-//   g_object_unref (rsdemux->adapter);
-
-  /* clean up temp audio buffers */
-  for (i = 0; i < 4; i++) {
-    g_free (rsdemux->audio_buffers[i]);
-  }
-
   G_OBJECT_CLASS (parent_class)->finalize (object);
 }
 
@@ -264,7 +252,6 @@ gst_rsdemux_finalize (GObject * object)
 static void
 gst_rsdemux_reset (GstRSDemux * rsdemux)
 {
-
   rsdemux->in_height = 0;
   rsdemux->in_width = 0;
   rsdemux->in_stride_bytes = 0;
@@ -275,55 +262,8 @@ gst_rsdemux_reset (GstRSDemux * rsdemux)
   rsdemux->depth_width = 0;
   rsdemux->depth_stride_bytes = 0;
 
-  g_atomic_int_set (&rsdemux->found_header, 0);
-  rsdemux->frame_len = -1;
   rsdemux->new_media = FALSE;
-  rsdemux->have_group_id = FALSE;
-  rsdemux->group_id = G_MAXUINT;
-  rsdemux->tag_event = NULL;
 }
-
-static gboolean
-have_group_id (GstRSDemux * demux)
-{
-  GstEvent *event;
-
-  event = gst_pad_get_sticky_event (demux->sinkpad, GST_EVENT_STREAM_START, 0);
-  if (event) {
-    if (gst_event_parse_group_id (event, &demux->group_id))
-      demux->have_group_id = TRUE;
-    else
-      demux->have_group_id = FALSE;
-    gst_event_unref (event);
-  } else if (!demux->have_group_id) {
-    demux->have_group_id = TRUE;
-    demux->group_id = gst_util_group_id_next ();
-  }
-
-  return demux->have_group_id;
-}
-
-// static GstEvent *
-// gst_rsdemux_create_global_tag_event (GstRSDemux * rsdemux)
-// {
-//   gchar rec_datetime[40];
-//   GstDateTime *rec_dt;
-//   GstTagList *tags;
-
-//   tags = gst_tag_list_new (GST_TAG_CONTAINER_FORMAT, "RS", NULL);
-//   gst_tag_list_set_scope (tags, GST_TAG_SCOPE_GLOBAL);
-
-// //   if (dv_get_recording_datetime (rsdemux->decoder, rec_datetime)) {
-// //     rec_dt = gst_date_time_new_from_iso8601_string (rec_datetime);
-// //     if (rec_dt) {
-// //       gst_tag_list_add (tags, GST_TAG_MERGE_REPLACE, GST_TAG_DATE_TIME,
-// //           rec_dt, NULL);
-// //       gst_date_time_unref (rec_dt);
-// //     }
-// //   }
-
-//   return gst_event_new_tag (tags);
-// }
 
 static GstPad *
 gst_rsdemux_add_pad (GstRSDemux * rsdemux, GstStaticPadTemplate * templ, GstCaps * caps)
@@ -345,24 +285,13 @@ gst_rsdemux_add_pad (GstRSDemux * rsdemux, GstStaticPadTemplate * templ, GstCaps
                 GST_ELEMENT_CAST (rsdemux),
                 templ == &color_src_tmpl ? "color" : "depth");
   event = gst_event_new_stream_start (stream_id);
-  if (have_group_id (rsdemux))
-    gst_event_set_group_id (event, rsdemux->group_id);
+  
   gst_pad_push_event (pad, event);
   g_free (stream_id);
 
   gst_pad_set_caps (pad, caps);
 
-  // gst_pad_push_event (pad, gst_event_new_segment (&rsdemux->time_segment));
-
   gst_element_add_pad (GST_ELEMENT (rsdemux), pad);
-
-  // if (!rsdemux->tag_event) {
-  //   rsdemux->tag_event = gst_rsdemux_create_global_tag_event (rsdemux);
-  // }
-
-  if (rsdemux->tag_event) {
-    gst_pad_push_event (pad, gst_event_ref (rsdemux->tag_event));
-  }
 
   return pad;
 }
@@ -951,31 +880,6 @@ gst_rsdemux_send_event (GstElement * element, GstEvent * event)
   gboolean res = FALSE;
 
   switch (GST_EVENT_TYPE (event)) {
-    case GST_EVENT_SEEK:
-    {
-      /* checking header and configuring the seek must be atomic */
-      GST_OBJECT_LOCK (rsdemux);
-      if (g_atomic_int_get (&rsdemux->found_header) == 0) {
-        GstEvent **event_p;
-
-        event_p = &rsdemux->seek_event;
-
-        /* We don't have pads yet. Keep the event. */
-        GST_INFO_OBJECT (rsdemux, "Keeping the seek event for later");
-
-        gst_event_replace (event_p, event);
-        GST_OBJECT_UNLOCK (rsdemux);
-
-        res = TRUE;
-      } else {
-        GST_OBJECT_UNLOCK (rsdemux);
-
-        // if (rsdemux->seek_handler)
-        //   res = rsdemux->seek_handler (rsdemux, rsdemux->colorsrcpad, event);
-        gst_event_unref (event);
-      }
-      break;
-    }
     default:
       res = GST_ELEMENT_CLASS (parent_class)->send_event (element, event);
       break;

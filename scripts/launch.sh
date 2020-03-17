@@ -10,4 +10,3 @@ GST_DEBUG=2
 gst-launch-1.0 -vvv -m realsensesrc stream-type=2 ! rsdemux name=demux \
     ! queue ! videoconvert ! autovideosink \
     demux. ! queue ! videoconvert ! autovideosink
-#    demux.! queue ! audioconvert ! alsasink demux. ! queue ! dvdec ! xvimagesink
