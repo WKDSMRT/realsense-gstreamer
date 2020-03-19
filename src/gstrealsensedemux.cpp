@@ -71,14 +71,6 @@ static gboolean gst_rsdemux_src_query (GstPad * pad, GstObject * parent,
 static gboolean gst_rsdemux_sink_query (GstPad * pad, GstObject * parent,
     GstQuery * query);
 
-/* convert functions */
-static gboolean gst_rsdemux_sink_convert (GstRSDemux * demux,
-    GstFormat src_format, gint64 src_value, GstFormat dest_format,
-    gint64 * dest_value);
-static gboolean gst_rsdemux_src_convert (GstRSDemux * demux, GstPad * pad,
-    GstFormat src_format, gint64 src_value, GstFormat dest_format,
-    gint64 * dest_value);
-
 /* event functions */
 static gboolean gst_rsdemux_send_event (GstElement * element, GstEvent * event);
 static gboolean gst_rsdemux_handle_src_event (GstPad * pad, GstObject * parent,
@@ -229,117 +221,6 @@ gst_rsdemux_remove_pads (GstRSDemux * rsdemux)
 }
 
 static gboolean
-gst_rsdemux_src_convert (GstRSDemux * rsdemux, GstPad * pad,
-    GstFormat src_format, gint64 src_value, GstFormat dest_format,
-    gint64 * dest_value)
-{
-  gboolean res = TRUE;
-
-  if (dest_format == src_format || src_value == -1) {
-    *dest_value = src_value;
-    goto done;
-  }
-
-//   if (rsdemux->decoder == NULL)
-//     goto error;
-
-  GST_INFO_OBJECT (pad,
-      "src_value:%" G_GINT64_FORMAT ", src_format:%d, dest_format:%d",
-      src_value, src_format, dest_format);
-
-  switch (src_format) {
-    case GST_FORMAT_BYTES:
-      switch (dest_format) {
-        default:
-          res = FALSE;
-      }
-      break;
-    case GST_FORMAT_TIME:
-      switch (dest_format) {
-        default:
-          res = FALSE;
-      }
-      break;
-    case GST_FORMAT_DEFAULT:
-    default:
-      res = FALSE;
-  }
-
-done:
-  GST_INFO_OBJECT (pad,
-      "Result : dest_format:%d, dest_value:%" G_GINT64_FORMAT ", res:%d",
-      dest_format, *dest_value, res);
-  return res;
-
-  /* ERRORS */
-error:
-  {
-    GST_INFO ("source conversion failed");
-    return FALSE;
-  }
-}
-
-static gboolean
-gst_rsdemux_sink_convert (GstRSDemux * rsdemux, GstFormat src_format,
-    gint64 src_value, GstFormat dest_format, gint64 * dest_value)
-{
-  gboolean res = TRUE;
-
-  GST_DEBUG_OBJECT (rsdemux, "%d -> %d", src_format, dest_format);
-  GST_INFO_OBJECT (rsdemux,
-      "src_value:%" G_GINT64_FORMAT ", src_format:%d, dest_format:%d",
-      src_value, src_format, dest_format);
-
-  if (dest_format == src_format || src_value == -1) {
-    *dest_value = src_value;
-    goto done;
-  }
-
-  switch (src_format) {
-    case GST_FORMAT_BYTES:
-      switch (dest_format) {
-        case GST_FORMAT_TIME:
-        {
-          // guint64 frame;
-
-          /* get frame number, rounds down so don't combine this
-           * line and the next line. */
-          // frame = src_value / rsdemux->frame_len;
-
-          // break;
-        }
-        default:
-          res = FALSE;
-      }
-      break;
-    case GST_FORMAT_TIME:
-      switch (dest_format) {
-        case GST_FORMAT_BYTES:
-        {
-          // break;
-        }
-        default:
-          res = FALSE;
-      }
-      break;
-    default:
-      res = FALSE;
-  }
-  GST_INFO_OBJECT (rsdemux,
-      "Result : dest_format:%d, dest_value:%" G_GINT64_FORMAT ", res:%d",
-      dest_format, *dest_value, res);
-
-done:
-  return res;
-
-error:
-  {
-    GST_INFO_OBJECT (rsdemux, "sink conversion failed");
-    return FALSE;
-  }
-}
-
-static gboolean
 gst_rsdemux_src_query (GstPad * pad, GstObject * parent, GstQuery * query)
 {
   gboolean res = TRUE;
@@ -436,66 +317,9 @@ gst_rsdemux_handle_sink_event (GstPad * pad, GstObject * parent,
   return res;
 }
 
-/* convert a pair of values on the given srcpad */
-static gboolean
-gst_rsdemux_convert_src_pair (GstRSDemux * rsdemux, GstPad * pad,
-    GstFormat src_format, gint64 src_start, gint64 src_stop,
-    GstFormat dst_format, gint64 * dst_start, gint64 * dst_stop)
-{
-  gboolean res;
-
-  GST_INFO ("starting conversion of start");
-  /* bring the format to time on srcpad. */
-  if (!(res = gst_rsdemux_src_convert (rsdemux, pad,
-              src_format, src_start, dst_format, dst_start))) {
-    goto done;
-  }
-  GST_INFO ("Finished conversion of start: %" G_GINT64_FORMAT, *dst_start);
-
-  GST_INFO ("starting conversion of stop");
-  /* bring the format to time on srcpad. */
-  if (!(res = gst_rsdemux_src_convert (rsdemux, pad,
-              src_format, src_stop, dst_format, dst_stop))) {
-    /* could not convert seek format to time offset */
-    goto done;
-  }
-  GST_INFO ("Finished conversion of stop: %" G_GINT64_FORMAT, *dst_stop);
-done:
-  return res;
-}
-
-/* convert a pair of values on the sinkpad */
-static gboolean
-gst_rsdemux_convert_sink_pair (GstRSDemux * rsdemux,
-    GstFormat src_format, gint64 src_start, gint64 src_stop,
-    GstFormat dst_format, gint64 * dst_start, gint64 * dst_stop)
-{
-  gboolean res;
-
-  GST_INFO ("starting conversion of start");
-  /* bring the format to time on srcpad. */
-  if (!(res = gst_rsdemux_sink_convert (rsdemux,
-              src_format, src_start, dst_format, dst_start))) {
-    goto done;
-  }
-  GST_INFO ("Finished conversion of start: %" G_GINT64_FORMAT, *dst_start);
-
-  GST_INFO ("starting conversion of stop");
-  /* bring the format to time on srcpad. */
-  if (!(res = gst_rsdemux_sink_convert (rsdemux,
-              src_format, src_stop, dst_format, dst_stop))) {
-    /* could not convert seek format to time offset */
-    goto done;
-  }
-  GST_INFO ("Finished conversion of stop: %" G_GINT64_FORMAT, *dst_stop);
-done:
-  return res;
-}
-
 static gboolean
 gst_rsdemux_send_event (GstElement * element, GstEvent * event)
 {
-  GstRSDemux *rsdemux = GST_RSDEMUX (element);
   gboolean res = FALSE;
 
   switch (GST_EVENT_TYPE (event)) {
@@ -570,45 +394,19 @@ RSHeader GetRSHeader(GstRSDemux* src, GstBuffer* buffer)
 static GstFlowReturn
 gst_rsdemux_demux_video (GstRSDemux * rsdemux, GstBuffer * buffer)//,guint64 duration)
 {
-  // return GST_FLOW_OK;
-  GstBuffer *outbuf;
   GstFlowReturn ret = GST_FLOW_OK;
-  GstCaps* caps;
-  // GST_DEBUG ("Demuxing video frame");
+  GST_DEBUG ("Demuxing video frame");
   
-  /* get params */
-  /* framerate is already up-to-date */
-  
-  // auto height = rsdemux->decoder->height;
-  // wide = dv_format_wide (rsdemux->decoder);
   const auto header = GetRSHeader(rsdemux, buffer);
+
   // see if anything changed 
   if (G_UNLIKELY (rsdemux->colorsrcpad == nullptr) || (rsdemux->in_stride_bytes != header.color_stride)) //|| (rsdemux->in_height != header.color_height))
   {
-    // gint par_x, par_y;
-
-    // rsdemux->in_height = height;
     rsdemux->in_stride_bytes = header.color_stride;
-    
-      
-    caps = gst_caps_new_simple ("video/x-dv",
-      "systemstream", G_TYPE_BOOLEAN, FALSE,
-      "width", G_TYPE_INT, 720,
-      "height", G_TYPE_INT, 480,
-      "framerate", GST_TYPE_FRACTION, 10, 30,
-      "pixel-aspect-ratio", GST_TYPE_FRACTION, 4, 3, NULL);
 
     gst_element_post_message(GST_ELEMENT_CAST(rsdemux), 
       gst_message_new_info(GST_OBJECT_CAST(rsdemux), NULL, "making pad caps"));
 
-    // auto color_caps = gst_caps_new_simple("video/x-raw", 
-    //   GST_VIDEO_CAPS_MAKE("{ RGB, RGBA, BGR, BGRA, GRAY16_LE, GRAY16_BE, YVYU }"),
-    //   NULL
-    // );
-    //     auto depth_caps = gst_caps_new_simple("video/x-raw", 
-    //   GST_VIDEO_CAPS_MAKE("{ GRAY16_LE, GRAY16_BE }"),
-    //   NULL
-    // );
     auto color_caps = gst_caps_new_simple ("video/x-raw",
           "format", G_TYPE_STRING, "RGB",
           "width", G_TYPE_INT, header.color_width,
