@@ -137,15 +137,6 @@ gst_rsdemux_init (GstRSDemux * rsdemux)
   /* now add the pad */
   gst_element_add_pad (GST_ELEMENT (rsdemux), rsdemux->sinkpad);
   // src pads will be created in the chain function
-
-//   rsdemux->adapter = gst_adapter_new ();
-
-  /* we need 4 temp buffers for audio decoding which are of a static
-   * size and which we can allocate here */
-//   for (i = 0; i < 4; i++) {
-//     rsdemux->audio_buffers[i] =
-//         (gint16 *) g_malloc (DV_AUDIO_MAX_SAMPLES * sizeof (gint16));
-//   }
 }
 
 static void
@@ -286,16 +277,14 @@ gst_rsdemux_handle_sink_event (GstPad * pad, GstObject * parent,
 
   switch (GST_EVENT_TYPE (event)) {
     case GST_EVENT_FLUSH_START:
-      /* we are not blocking on anything exect the push() calls
+      /* we are not blocking on anything except the push() calls
        * to the peer which will be unblocked by forwarding the
        * event.*/
       res = gst_rsdemux_push_event (rsdemux, event);
       break;
     case GST_EVENT_FLUSH_STOP:
-    //   gst_adapter_clear (rsdemux->adapter);
-      GST_DEBUG ("cleared adapter");
-      // gst_segment_init (&rsdemux->byte_segment, GST_FORMAT_BYTES);
-      // gst_segment_init (&rsdemux->time_segment, GST_FORMAT_TIME);
+      //  TODO gst_adapter_clear (rsdemux->adapter);
+      // GST_DEBUG ("cleared adapter");
       res = gst_rsdemux_push_event (rsdemux, event);
       break;
     case GST_EVENT_EOS:
@@ -304,7 +293,7 @@ gst_rsdemux_handle_sink_event (GstPad * pad, GstObject * parent,
       /* forward event */
       res = gst_rsdemux_push_event (rsdemux, event);
       /* and clear the adapter */
-    //   gst_adapter_clear (rsdemux->adapter);
+      //   gst_adapter_clear (rsdemux->adapter);
       break;
     case GST_EVENT_CAPS:
       gst_event_unref (event);
@@ -337,31 +326,28 @@ gst_rsdemux_handle_src_event (GstPad * pad, GstObject * parent,
     GstEvent * event)
 {
   gboolean res = FALSE;
-  // GstRSDemux *rsdemux;
 
-  // rsdemux = GST_RSDEMUX (parent);
+  const auto rsdemux = GST_RSDEMUX (parent);
 
-  // switch (GST_EVENT_TYPE (event)) {
-  //   default:
-  //     res = gst_pad_push_event (rsdemux->sinkpad, event);
-  //     break;
-  // }
+  switch (GST_EVENT_TYPE (event)) {
+    // TODO handle src pad events here
+    default:
+      res = gst_pad_push_event (rsdemux->sinkpad, event);
+      break;
+  }
 
   return res;
   }
 
 RSHeader GetRSHeader(GstRSDemux* src, GstBuffer* buffer)
 {
-
   gst_element_post_message(GST_ELEMENT_CAST(src), 
           gst_message_new_info(GST_OBJECT_CAST(src), NULL, "extracting header"));
-#if 1
   RSHeader header;
   RSHeader* in;
   GstMapInfo map;
   gst_buffer_map(buffer, &map, GST_MAP_READ);
   in = reinterpret_cast<RSHeader*>(map.data);
-  // memcpy(&header, map.data, sizeof(RSHeader));
 
   header.color_height = in->color_height;
   header.color_width = in->color_width;
@@ -373,19 +359,6 @@ RSHeader GetRSHeader(GstRSDemux* src, GstBuffer* buffer)
   header.depth_format = in->depth_format;
   
   gst_buffer_unmap(buffer, &map);
-#else
-  RSHeader header{
-    720,
-    1280,
-    3840,
-    GST_VIDEO_FORMAT_RGB,
-    480,
-    848,
-    1696,
-    GST_VIDEO_FORMAT_GRAY16_LE
-  };
-#endif
-
 
   return header;
 }
@@ -480,9 +453,7 @@ gst_rsdemux_demux_video (GstRSDemux * rsdemux, GstBuffer * buffer)//,guint64 dur
         
   ret = gst_pad_push (rsdemux->colorsrcpad, colorbuf);
   ret = gst_pad_push (rsdemux->depthsrcpad, depthbuf);
-#if PROBABLY_UNUSED
-  rsdemux->video_offset++;
-#endif
+
   return ret;
 }
 
@@ -509,81 +480,25 @@ gst_rsdemux_demux_frame (GstRSDemux * rsdemux, GstBuffer * buffer)
     if (G_UNLIKELY (vret == GST_FLOW_NOT_LINKED)) {
           ret = GST_FLOW_NOT_LINKED;
     }
-      // goto done;
   }
   catch(const std::exception& e)
   {
     GST_ELEMENT_ERROR (rsdemux, RESOURCE, FAILED, ("gst_rsdemux_demux_frame: %s", e.what()), (NULL));
   }
-// done:
-  return ret;
 
-  /* ERRORS */
-// segment_error:
-//   {
-//     GST_DEBUG ("error generating new_segment event");
-//     gst_buffer_unref (buffer);
-//     return GST_FLOW_ERROR;
-//   }
+  return ret;
 }
 
-/* flush any remaining data in the adapter, used in chain based scheduling mode */
+/* TODO refactor. this function did a lot more in the dvdemux element
+ * It can be moved from here
+ */
 static GstFlowReturn
 gst_rsdemux_flush_buffer (GstRSDemux * rsdemux, GstBuffer * buffer)
 {
   GstFlowReturn ret = GST_FLOW_OK;
-
-  // while (gst_adapter_available (rsdemux->adapter) >= rsdemux->frame_len) {
-    // const guint8 *data;
-    // gint length;
-
-    // get the accumulated bytes 
-    // data = gst_adapter_map (rsdemux->adapter, rsdemux->frame_len);
-
-    // parse header to know the length and other params 
-    // if (G_UNLIKELY (dv_parse_header (rsdemux->decoder, data) < 0)) {
-      // gst_adapter_unmap (rsdemux->adapter);
-      // goto parse_header_error;
-    // }
-    // gst_adapter_unmap (rsdemux->adapter);
-
-    // after parsing the header we know the length of the data 
-    // length = rsdemux->frame_len = rsdemux->decoder->frame_size;
-    // if (rsdemux->decoder->system == e_dv_system_625_50) {
-      // rsdemux->framerate_numerator = PAL_FRAMERATE_NUMERATOR;
-      // rsdemux->framerate_denominator = PAL_FRAMERATE_DENOMINATOR;
-    // } else {
-      // rsdemux->framerate_numerator = NTSC_FRAMERATE_NUMERATOR;
-      // rsdemux->framerate_denominator = NTSC_FRAMERATE_DENOMINATOR;
-    // }
-    // g_atomic_int_set (&rsdemux->found_header, 1);
-
-    // let demux_video set the height, it needs to detect when things change so
-    // it can reset caps 
-
-    // if we still have enough for a frame, start decoding 
-    // if (G_LIKELY (gst_adapter_available (rsdemux->adapter) >= length)) {
-      // GstBuffer *buffer;
-
-      // buffer = gst_adapter_take_buffer (rsdemux->adapter, length);
-
-      // and decode the buffer, takes ownership 
-      ret = gst_rsdemux_demux_frame (rsdemux, buffer);
-      if (G_UNLIKELY (ret != GST_FLOW_OK))
-        goto done;
-    // }
-  // }
+  ret = gst_rsdemux_demux_frame (rsdemux, buffer);
   
-done:
   return ret;
-
-  /* ERRORS */
-// parse_header_error:
-//   {
-//     GST_ELEMENT_ERROR (rsdemux, STREAM, DECODE,
-//         (NULL), ("Error parsing header"));
-//     return GST_FLOW_ERROR;
-//   }
 }
 
 /* flush any remaining data in the adapter, used in chain based scheduling mode */
@@ -594,29 +509,22 @@ gst_rsdemux_flush (GstRSDemux * rsdemux)
   return GST_FLOW_OK;
 }
 
-/* streaming operation: 
- *
- * accumulate data until we have a frame, then decode. 
- */
+// streaming operation
 static GstFlowReturn
 gst_rsdemux_chain (GstPad * pad, GstObject * parent, GstBuffer * buffer)
 {
   GstFlowReturn ret;
-  // GstClockTime timestamp;
-  // GstRSDemux *rsdemux;
   auto rsdemux = GST_RSDEMUX (parent);
 
-  // Probably don't need to deal with discontinuity
-
-  /* a timestamp always should be respected */
+  /* FIXME a timestamp always should be respected */
   // timestamp = GST_BUFFER_TIMESTAMP (buffer);
 
-  /* and try to flush pending frames */
   ret = gst_rsdemux_flush_buffer (rsdemux, buffer);
 
   return ret;
 }
 
+// FIXME looks like we don't need this
 static gboolean
 gst_rsdemux_sink_activate_mode (GstPad * sinkpad, GstObject * parent,
     GstPadMode mode, gboolean active)
@@ -642,7 +550,7 @@ gst_rsdemux_sink_activate_mode (GstPad * sinkpad, GstObject * parent,
   return res;
 }
 
-/* decide on push or pull based scheduling */
+/* FIXME decide on push or pull based scheduling */
 static gboolean
 gst_rsdemux_sink_activate (GstPad * sinkpad, GstObject * parent)
 {
