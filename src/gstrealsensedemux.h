@@ -1,20 +1,4 @@
-/* GStreamer
- * Copyright (C) <1999> Erik Walthinsen <omega@cse.ogi.edu>
- *
- * This library is free software; you can redistribute it and/or
- * modify it under the terms of the GNU Library General Public
- * License as published by the Free Software Foundation; either
- * version 2 of the License, or (at your option) any later version.
- *
- * This library is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * Library General Public License for more details.
- *
- * You should have received a copy of the GNU Library General Public
- * License along with this library; if not, write to the
- * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
- * Boston, MA 02110-1301, USA.
+/* 
  */
 
 
@@ -22,8 +6,6 @@
 #define __GST_RSDEMUX_H__
 
 #include <gst/gst.h>
-// #include <libdv/dv.h>
-// #include <gst/base/gstadapter.h>
 
 G_BEGIN_DECLS
 
@@ -42,9 +24,6 @@ G_BEGIN_DECLS
 typedef struct _GstRSDemux GstRSDemux;
 typedef struct _GstRSDemuxClass GstRSDemuxClass;
 
-typedef gboolean (*GstDVDemuxSeekHandler) (GstRSDemux *demux, GstPad * pad, GstEvent * event);
-
-// TODO review all members
 struct _GstRSDemux {
   GstElement     element;
 
@@ -68,12 +47,6 @@ struct _GstRSDemux {
   gint           depth_width;
   gint           depth_stride_bytes;
   gint           frame_count = 0;
-
-// TODO What do these values do? Are they needed?
-  gint           frame_len;
-
-  gboolean       new_media;
-  int            frames_since_new_media;
 };
 
 struct _GstRSDemuxClass 

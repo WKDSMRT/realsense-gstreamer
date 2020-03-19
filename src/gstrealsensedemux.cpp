@@ -1,21 +1,19 @@
-/* GStreamer
- * Copyright (C) <1999> Erik Walthinsen <omega@cse.ogi.edu>
- *               <2005> Wim Taymans <wim@fluendo.com>
+/* GStreamer realsense demux
  *
- * This library is free software; you can redistribute it and/or
- * modify it under the terms of the GNU Library General Public
- * License as published by the Free Software Foundation; either
- * version 2 of the License, or (at your option) any later version.
+ * SECTION:element-rsdemux
+ * @title: rsdemux
  *
- * This library is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * Library General Public License for more details.
+ * rsdemux splits muxed Realsense stream into its color and depth components. 
  *
- * You should have received a copy of the GNU Library General Public
- * License along with this library; if not, write to the
- * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
- * Boston, MA 02110-1301, USA.
+ * ## Example launch line
+ * |[
+ *   gst-launch-1.0 -vvv -m realsensesrc stream-type=2 ! rsdemux name=demux \
+ *     ! queue ! videoconvert ! autovideosink \
+ *     demux. ! queue ! videoconvert ! autovideosink
+ * ]| 
+ * This pipeline captures realsense stream, demuxes it to color and depth
+ * and renders them to videosinks.
+ *
  */
 
 #ifdef HAVE_CONFIG_H
@@ -24,84 +22,10 @@
 
 #include <gst/video/video.h>
 
-// #include <gst/audio/audio.h>
 #include "gstrealsensedemux.h"
-// #include "gstsmptetimecode.h"
 #include "gstrealsenseplugin.h"
 
-/**
- * SECTION:element-rsdemux
- * @title: rsdemux
- *
- * rsdemux splits raw DV into its audio and video components. The audio will be
- * decoded raw samples and the video will be encoded DV video.
- *
- * This element can operate in both push and pull mode depending on the
- * capabilities of the upstream peer.
- *
- * ## Example launch line
- * |[
- * gst-launch-1.0 filesrc location=test.dv ! rsdemux name=demux ! queue ! audioconvert ! alsasink demux. ! queue ! dvdec ! xvimagesink
- * ]| This pipeline decodes and renders the raw DV stream to an audio and a videosink.
- *
- */
-
-/* DV output has two modes, normal and wide. The resolution is the same in both
- * cases: 720 pixels wide by 576 pixels tall in PAL format, and 720x480 for
- * NTSC.
- *
- * Each of the modes has its own pixel aspect ratio, which is fixed in practice
- * by ITU-R BT.601 (also known as "CCIR-601" or "Rec.601"). Or so claims a
- * reference that I culled from the reliable "internet",
- * http://www.mir.com/DMG/aspect.html. Normal PAL is 59/54 and normal NTSC is
- * 10/11. Because the pixel resolution is the same for both cases, we can get
- * the pixel aspect ratio for wide recordings by multiplying by the ratio of
- * display aspect ratios, 16/9 (for wide) divided by 4/3 (for normal):
- *
- * Wide NTSC: 10/11 * (16/9)/(4/3) = 40/33
- * Wide PAL: 59/54 * (16/9)/(4/3) = 118/81
- *
- * However, the pixel resolution coming out of a DV source does not combine with
- * the standard pixel aspect ratios to give a proper display aspect ratio. An
- * image 480 pixels tall, with a 4:3 display aspect ratio, will be 768 pixels
- * wide. But, if we take the normal PAL aspect ratio of 59/54, and multiply it
- * with the width of the DV image (720 pixels), we get 786.666..., which is
- * nonintegral and too wide. The camera is not outputting a 4:3 image.
- * 
- * If the video sink for this stream has fixed dimensions (such as for
- * fullscreen playback, or for a java applet in a web page), you then have two
- * choices. Either you show the whole image, but pad the image with black
- * borders on the top and bottom (like watching a widescreen video on a 4:3
- * device), or you crop the video to the proper ratio. Apparently the latter is
- * the standard practice.
- *
- * For its part, GStreamer is concerned with accuracy and preservation of
- * information. This element outputs the 720x576 or 720x480 video that it
- * receives, noting the proper aspect ratio. This should not be a problem for
- * windowed applications, which can change size to fit the video. Applications
- * with fixed size requirements should decide whether to crop or pad which
- * an element such as videobox can do.
- */
-
-#define NTSC_HEIGHT 480
-#define NTSC_BUFFER 120000
-#define NTSC_FRAMERATE_NUMERATOR 30000
-#define NTSC_FRAMERATE_DENOMINATOR 1001
-
-#define PAL_HEIGHT 576
-#define PAL_BUFFER 144000
-#define PAL_FRAMERATE_NUMERATOR 25
-#define PAL_FRAMERATE_DENOMINATOR 1
-
-#define PAL_NORMAL_PAR_X        16
-#define PAL_NORMAL_PAR_Y        15
-#define PAL_WIDE_PAR_X          64
-#define PAL_WIDE_PAR_Y          45
-
-#define NTSC_NORMAL_PAR_X       8
-#define NTSC_NORMAL_PAR_Y       9
-#define NTSC_WIDE_PAR_X         32
-#define NTSC_WIDE_PAR_Y         27
+#include <stdexcept>
 
 GST_DEBUG_CATEGORY_STATIC (rsdemux_debug);
 #define GST_CAT_DEFAULT rsdemux_debug
@@ -135,16 +59,6 @@ static GstStaticPadTemplate depth_src_tmpl = GST_STATIC_PAD_TEMPLATE ("depth",
     GST_STATIC_CAPS (GST_VIDEO_CAPS_MAKE
         ("{ GRAY16_LE, GRAY16_BE }"))
     );
-
-// static GstStaticPadTemplate audio_src_temp = GST_STATIC_PAD_TEMPLATE ("audio",
-//     GST_PAD_SRC,
-//     GST_PAD_SOMETIMES,
-//     GST_STATIC_CAPS ("audio/x-raw, "
-//         "format = (string) " GST_AUDIO_NE (S16) ", "
-//         "layout = (string) interleaved, "
-//         "rate = (int) { 32000, 44100, 48000 }, " "channels = (int) {2, 4}")
-//     );
-
 
 #define gst_rsdemux_parent_class parent_class
 G_DEFINE_TYPE (GstRSDemux, gst_rsdemux, GST_TYPE_ELEMENT);
@@ -261,8 +175,6 @@ gst_rsdemux_reset (GstRSDemux * rsdemux)
   rsdemux->depth_height = 0;
   rsdemux->depth_width = 0;
   rsdemux->depth_stride_bytes = 0;
-
-  rsdemux->new_media = FALSE;
 }
 
 static GstPad *
@@ -328,9 +240,6 @@ gst_rsdemux_src_convert (GstRSDemux * rsdemux, GstPad * pad,
     goto done;
   }
 
-  if (rsdemux->frame_len <= 0)
-    goto error;
-
 //   if (rsdemux->decoder == NULL)
 //     goto error;
 
@@ -341,76 +250,17 @@ gst_rsdemux_src_convert (GstRSDemux * rsdemux, GstPad * pad,
   switch (src_format) {
     case GST_FORMAT_BYTES:
       switch (dest_format) {
-        case GST_FORMAT_DEFAULT:
-          if (pad == rsdemux->colorsrcpad || pad == rsdemux->depthsrcpad)
-            *dest_value = src_value / rsdemux->frame_len;
-#if AUDIO_SRC
-          else if (pad == rsdemux->audiosrcpad)
-            *dest_value = src_value / (2 * rsdemux->channels);
-#endif
-          break;
-        case GST_FORMAT_TIME:
-
-#if AUDIO_SRC                
-          else if (pad == rsdemux->audiosrcpad)
-            *dest_value = gst_util_uint64_scale_int (src_value, GST_SECOND,
-                2 * rsdemux->frequency * rsdemux->channels);
-#endif        
-          break;
         default:
           res = FALSE;
       }
       break;
     case GST_FORMAT_TIME:
       switch (dest_format) {
-        case GST_FORMAT_BYTES:
-#if AUDIO_SRC                
-          else if (pad == rsdemux->audiosrcpad)
-            *dest_value = gst_util_uint64_scale_int (src_value,
-                2 * rsdemux->frequency * rsdemux->channels, GST_SECOND);
-#endif                
-          break;
-        case GST_FORMAT_DEFAULT:
-          if (pad == rsdemux->colorsrcpad || pad == rsdemux->depthsrcpad) {
-          }
-#if AUDIO_SRC
-          else if (pad == rsdemux->audiosrcpad) {
-            *dest_value = gst_util_uint64_scale (src_value,
-                rsdemux->frequency, GST_SECOND);
-          }
-#endif          
-          break;
         default:
           res = FALSE;
       }
       break;
     case GST_FORMAT_DEFAULT:
-      switch (dest_format) {
-        case GST_FORMAT_TIME:
-#if AUDIO_SRC
-          else if (pad == rsdemux->audiosrcpad) {
-            if (src_value)
-              *dest_value = gst_util_uint64_scale (src_value,
-                  GST_SECOND, rsdemux->frequency);
-            else
-              *dest_value = 0;
-          }
-#endif
-          break;
-        case GST_FORMAT_BYTES:
-          if (pad == rsdemux->colorsrcpad || pad == rsdemux->depthsrcpad) {
-            *dest_value = src_value * rsdemux->frame_len;
-          } 
-#if AUDIO_SRC
-          else if (pad == rsdemux->audiosrcpad) {
-            *dest_value = src_value * 2 * rsdemux->channels;
-          }
-#endif          
-          break;
-        default:
-          res = FALSE;
-      }
-      break;
     default:
       res = FALSE;
   }
@@ -444,9 +294,6 @@ gst_rsdemux_sink_convert (GstRSDemux * rsdemux, GstFormat src_format,
     *dest_value = src_value;
     goto done;
   }
-
-  if (rsdemux->frame_len <= 0)
-    goto error;
 
   switch (src_format) {
     case GST_FORMAT_BYTES:
@@ -496,156 +343,32 @@ static gboolean
 gst_rsdemux_src_query (GstPad * pad, GstObject * parent, GstQuery * query)
 {
   gboolean res = TRUE;
-  // GstRSDemux *rsdemux = GST_RSDEMUX (parent);
 
+  // TODO Handle any necessary src queries
   switch (GST_QUERY_TYPE (query)) {
     case GST_QUERY_DURATION:
-    {
-      // GstFormat format;
-      // gint64 end;
-      // GstQuery *pquery;
-
-      // /* First ask the peer in the original format */
-      // if (!gst_pad_peer_query (rsdemux->sinkpad, query)) {
-      //   /* get target format */
-      //   gst_query_parse_duration (query, &format, NULL);
-
-      //   /* Now ask the peer in BYTES format and try to convert */
-      //   pquery = gst_query_new_duration (GST_FORMAT_BYTES);
-      //   if (!gst_pad_peer_query (rsdemux->sinkpad, pquery)) {
-      //     gst_query_unref (pquery);
-      //     goto error;
-      //   }
-
-      //   /* get peer total length */
-      //   gst_query_parse_duration (pquery, NULL, &end);
-      //   gst_query_unref (pquery);
-
-      //   /* convert end to requested format */
-      //   if (end != -1) {
-      //     if (!(res = gst_rsdemux_sink_convert (rsdemux,
-      //                 GST_FORMAT_BYTES, end, format, &end))) {
-      //       goto error;
-      //     }
-      //     gst_query_set_duration (query, format, end);
-      //   }
-      // }
-      // break;
-    }
-    case GST_QUERY_CONVERT:
-    {
-      // GstFormat src_fmt, dest_fmt;
-      // gint64 src_val, dest_val;
-
-      // gst_query_parse_convert (query, &src_fmt, &src_val, &dest_fmt, &dest_val);
-      // if (!(res =
-      //         gst_rsdemux_src_convert (rsdemux, pad, src_fmt, src_val,
-      //             dest_fmt, &dest_val)))
-      //   goto error;
-      // gst_query_set_convert (query, src_fmt, src_val, dest_fmt, dest_val);
-      // break;
-    }
-    case GST_QUERY_SEEKING:
-    {
-      // GstFormat fmt;
-      // GstQuery *peerquery;
-      // gboolean seekable;
-
-      // gst_query_parse_seeking (query, &fmt, NULL, NULL, NULL);
-
-      // /* We can only handle TIME seeks really */
-      // if (fmt != GST_FORMAT_TIME) {
-      //   gst_query_set_seeking (query, fmt, FALSE, -1, -1);
-      //   break;
-      // }
-
-      // /* First ask upstream */
-      // if (gst_pad_peer_query (rsdemux->sinkpad, query)) {
-      //   gst_query_parse_seeking (query, NULL, &seekable, NULL, NULL);
-      //   if (seekable) {
-      //     res = TRUE;
-      //     break;
-      //   }
-      // }
-
-      // res = TRUE;
-
-      // peerquery = gst_query_new_seeking (GST_FORMAT_BYTES);
-      // seekable = gst_pad_peer_query (rsdemux->sinkpad, peerquery);
-
-      // if (seekable)
-      //   gst_query_parse_seeking (peerquery, NULL, &seekable, NULL, NULL);
-      // gst_query_unref (peerquery);
-
-      // if (seekable) {
-      //   peerquery = gst_query_new_duration (GST_FORMAT_TIME);
-      //   seekable = gst_rsdemux_src_query (pad, parent, peerquery);
-
-      //   if (seekable) {
-      //     gint64 duration;
-
-      //     gst_query_parse_duration (peerquery, NULL, &duration);
-      //     gst_query_set_seeking (query, GST_FORMAT_TIME, seekable, 0, duration);
-      //   } else {
-      //     gst_query_set_seeking (query, GST_FORMAT_TIME, FALSE, -1, -1);
-      //   }
-
-      //   gst_query_unref (peerquery);
-      // } else {
-      //   gst_query_set_seeking (query, GST_FORMAT_TIME, FALSE, -1, -1);
-      // }
-      // break;
-    }
     default:
       res = gst_pad_query_default (pad, parent, query);
       break;
   }
 
   return res;
-
-  /* ERRORS */
-// error:
-//   {
-//     GST_DEBUG ("error source query");
-//     return FALSE;
-//   }
 }
 
 static gboolean
 gst_rsdemux_sink_query (GstPad * pad, GstObject * parent, GstQuery * query)
 {
   gboolean res = TRUE;
-  GstRSDemux *rsdemux;
 
-  rsdemux = GST_RSDEMUX (parent);
-
+  // TODO Handle any sink queries
   switch (GST_QUERY_TYPE (query)) {
-    case GST_QUERY_CONVERT:
-    {
-      // GstFormat src_fmt, dest_fmt;
-      // gint64 src_val, dest_val;
-
-      // gst_query_parse_convert (query, &src_fmt, &src_val, &dest_fmt, &dest_val);
-      // if (!(res =
-      //         gst_rsdemux_sink_convert (rsdemux, src_fmt, src_val, dest_fmt,
-      //             &dest_val)))
-      //   goto error;
-      // gst_query_set_convert (query, src_fmt, src_val, dest_fmt, dest_val);
-      // break;
-    }
+    case GST_QUERY_DURATION:
     default:
       res = gst_pad_query_default (pad, parent, query);
       break;
   }
 
   return res;
-
-  /* ERRORS */
-// error:
-//   {
-//     GST_DEBUG ("error handling sink query");
-//     return FALSE;
-//   }
 }
 
 /* takes ownership of the event */
@@ -658,11 +381,13 @@ gst_rsdemux_push_event (GstRSDemux * rsdemux, GstEvent * event)
     gst_event_ref (event);
     res |= gst_pad_push_event (rsdemux->colorsrcpad, event);
   }
-#if AUDIO_SRC
-  if (rsdemux->audiosrcpad)
-    res |= gst_pad_push_event (rsdemux->audiosrcpad, event);
-  else 
-#endif
+
+  if (rsdemux->depthsrcpad) {
+    gst_event_ref (event);
+    res |= gst_pad_push_event (rsdemux->depthsrcpad, event);
+  }
+
+  if (rsdemux->colorsrcpad==nullptr && rsdemux->depthsrcpad==nullptr) 
   {
     gst_event_unref (event);
     res = TRUE;
@@ -766,112 +491,6 @@ gst_rsdemux_convert_sink_pair (GstRSDemux * rsdemux,
 done:
   return res;
 }
-
-/* convert a pair of values on the srcpad to a pair of
- * values on the sinkpad 
- */
-// static gboolean
-// gst_rsdemux_convert_src_to_sink (GstRSDemux * rsdemux, GstPad * pad,
-//     GstFormat src_format, gint64 src_start, gint64 src_stop,
-//     GstFormat dst_format, gint64 * dst_start, gint64 * dst_stop)
-// {
-//   GstFormat conv;
-//   gboolean res;
-
-//   conv = GST_FORMAT_TIME;
-//   /* convert to TIME intermediate format */
-//   if (!(res = gst_rsdemux_convert_src_pair (rsdemux, pad,
-//               src_format, src_start, src_stop, conv, dst_start, dst_stop))) {
-//     /* could not convert format to time offset */
-//     goto done;
-//   }
-//   /* convert to dst format on sinkpad */
-//   if (!(res = gst_rsdemux_convert_sink_pair (rsdemux,
-//               conv, *dst_start, *dst_stop, dst_format, dst_start, dst_stop))) {
-//     /* could not convert format to time offset */
-//     goto done;
-//   }
-// done:
-//   return res;
-// }
-
-#if 0
-static gboolean
-gst_rsdemux_convert_segment (Gstrsdemux * rsdemux, GstSegment * src,
-    GstSegment * dest)
-{
-  dest->rate = src->rate;
-  dest->abs_rate = src->abs_rate;
-  dest->flags = src->flags;
-
-  return TRUE;
-}
-#endif
-
-/* handle seek in push base mode.
- *
- * Convert the time seek to a bytes seek and send it
- * upstream
- * Does not take ownership of the event.
- */
-// static gboolean
-// gst_rsdemux_handle_push_seek (GstRSDemux * rsdemux, GstPad * pad,
-//     GstEvent * event)
-// {
-//   gboolean res = FALSE;
-//   gdouble rate;
-//   GstSeekFlags flags;
-//   GstFormat format;
-//   GstSeekType cur_type, stop_type;
-//   gint64 cur, stop;
-//   gint64 start_position, end_position;
-//   GstEvent *newevent;
-
-//   gst_event_parse_seek (event, &rate, &format, &flags,
-//       &cur_type, &cur, &stop_type, &stop);
-
-//   /* First try if upstream can handle time based seeks */
-//   if (format == GST_FORMAT_TIME)
-//     res = gst_pad_push_event (rsdemux->sinkpad, gst_event_ref (event));
-
-//   if (!res) {
-//     /* we convert the start/stop on the srcpad to the byte format
-//      * on the sinkpad and forward the event */
-//     res = gst_rsdemux_convert_src_to_sink (rsdemux, pad,
-//         format, cur, stop, GST_FORMAT_BYTES, &start_position, &end_position);
-//     if (!res)
-//       goto done;
-
-//     /* now this is the updated seek event on bytes */
-//     newevent = gst_event_new_seek (rate, GST_FORMAT_BYTES, flags,
-//         cur_type, start_position, stop_type, end_position);
-//     gst_event_set_seqnum (newevent, gst_event_get_seqnum (event));
-
-//     res = gst_pad_push_event (rsdemux->sinkpad, newevent);
-//   }
-// done:
-//   return res;
-// }
-
-#if PROBABLY_UNUSED
-static void
-gst_rsdemux_update_frame_offsets (GstRSDemux * rsdemux, GstClockTime timestamp)
-{
-  /* calculate current frame number */
-  gst_rsdemux_src_convert (rsdemux, rsdemux->colorsrcpad,
-      rsdemux->time_segment.format, timestamp,
-      GST_FORMAT_DEFAULT, &rsdemux->video_offset);
-
-#if AUDIO_SRC
-  /* calculate current audio number */
-  gst_rsdemux_src_convert (rsdemux, rsdemux->audiosrcpad,
-      rsdemux->time_segment.format, timestamp,
-      GST_FORMAT_DEFAULT, &rsdemux->audio_offset);
-#endif
-  /* every DV frame corresponts with one video frame */
-  rsdemux->frame_offset = rsdemux->video_offset;
-}
-#endif
 
 static gboolean
 gst_rsdemux_send_event (GstElement * element, GstEvent * event)
@@ -1054,9 +673,6 @@ gst_rsdemux_demux_video (GstRSDemux * rsdemux, GstBuffer * buffer)//,guint64 dur
   // TODO What is duration? some sort of timestamp?
   // GST_BUFFER_DURATION (outbuf) = duration;
 
-  if (rsdemux->new_media)// || rsdemux->discont)
-    GST_BUFFER_FLAG_SET (outbuf, GST_BUFFER_FLAG_DISCONT);
-
   gst_buffer_unmap(buffer, &inmap);
   gst_buffer_unmap(colorbuf, &cmap);
   gst_buffer_unmap(depthbuf, &dmap);
@@ -1072,58 +688,12 @@ gst_rsdemux_demux_video (GstRSDemux * rsdemux, GstBuffer * buffer)//,guint64 dur
   return ret;
 }
 
-// static gboolean
-// gst_rsdemux_is_new_media (GstRSDemux * rsdemux, GstBuffer * buffer)
-// {
-//   guint8 *data;
-//   GstMapInfo map;
-//   int aaux_offset;
-//   int dif;
-//   int n_difs;
-
-// //   n_difs = rsdemux->decoder->num_dif_seqs;
-
-//   gst_buffer_map (buffer, &map, GST_MAP_READ);
-//   data = map.data;
-//   for (dif = 0; dif < n_difs; dif++) {
-//     if (dif & 1) {
-//       aaux_offset = (dif * 12000) + (6 + 16 * 1) * 80 + 3;
-//     } else {
-//       aaux_offset = (dif * 12000) + (6 + 16 * 4) * 80 + 3;
-//     }
-//     if (data[aaux_offset + 0] == 0x51) {
-//       if ((data[aaux_offset + 2] & 0x80) == 0) {
-//         gst_buffer_unmap (buffer, &map);
-//         return TRUE;
-//       }
-//     }
-//   }
-
-//   gst_buffer_unmap (buffer, &map);
-//   return FALSE;
-// }
-#include <stdexcept>
-
 /* takes ownership of buffer */
 static GstFlowReturn
 gst_rsdemux_demux_frame (GstRSDemux * rsdemux, GstBuffer * buffer)
 {
-  // GstClockTime next_ts;
   GstFlowReturn vret, ret;
-  // GstMapInfo map;
-  // guint64 duration;
-  // int frame_number;
-
-  // gst_buffer_map (buffer, &map, GST_MAP_READ);
-//   dv_parse_packs (rsdemux->decoder, map.data);
-  // gst_buffer_unmap (buffer, &map);
-  // rsdemux->new_media = FALSE;
-  // if (gst_rsdemux_is_new_media (rsdemux, buffer) &&
-  //     rsdemux->frames_since_new_media > 2) {
-  //   rsdemux->new_media = TRUE;
-  //   rsdemux->frames_since_new_media = 0;
-  // }
-  // rsdemux->frames_since_new_media++;
+  
   rsdemux->frame_count++;
   
   gst_element_post_message(GST_ELEMENT_CAST(rsdemux), 
