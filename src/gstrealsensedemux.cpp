@@ -80,7 +80,6 @@ static gboolean gst_rsdemux_handle_sink_event (GstPad * pad, GstObject * parent,
 
 /* scheduling functions */
 static GstFlowReturn gst_rsdemux_flush (GstRSDemux * rsdemux);
-static GstFlowReturn gst_rsdemux_flush_buffer (GstRSDemux * rsdemux, GstBuffer* buffer);
 static GstFlowReturn gst_rsdemux_chain (GstPad * pad, GstObject * parent,
     GstBuffer * buffer);
 
@@ -365,7 +364,7 @@ RSHeader GetRSHeader(GstRSDemux* src, GstBuffer* buffer)
 
 /* takes ownership of buffer FIXME */
 static GstFlowReturn
-gst_rsdemux_demux_video (GstRSDemux * rsdemux, GstBuffer * buffer)//,guint64 duration)
+gst_rsdemux_demux_video (GstRSDemux * rsdemux, GstBuffer * buffer)
 {
   GstFlowReturn ret = GST_FLOW_OK;
   GST_DEBUG ("Demuxing video frame");
@@ -416,7 +415,6 @@ gst_rsdemux_demux_video (GstRSDemux * rsdemux, GstBuffer * buffer)//,guint64 dur
     gst_caps_unref (depth_caps);
   }
   
-  // TODO create colorbuf and depth buf and fill them
   /* takes ownership of buffer here, we just need to modify
    * the metadata. */
   // outbuf = gst_buffer_make_writable (buffer);
@@ -441,8 +439,8 @@ gst_rsdemux_demux_video (GstRSDemux * rsdemux, GstBuffer * buffer)//,guint64 dur
   auto ddata = cdata + color_sz;
   memcpy(dmap.data, ddata, depth_sz);
 
-  // TODO What is duration? some sort of timestamp?
-  // GST_BUFFER_DURATION (outbuf) = duration;
+  GST_BUFFER_TIMESTAMP (colorbuf) = GST_BUFFER_TIMESTAMP(buffer);
+  GST_BUFFER_TIMESTAMP (depthbuf) = GST_BUFFER_TIMESTAMP(buffer);
 
   gst_buffer_unmap(buffer, &inmap);
   gst_buffer_unmap(colorbuf, &cmap);
@@ -468,6 +466,7 @@ gst_rsdemux_demux_frame (GstRSDemux * rsdemux, GstBuffer * buffer)
   gst_element_post_message(GST_ELEMENT_CAST(rsdemux), 
             gst_message_new_info(GST_OBJECT_CAST(rsdemux), NULL, "demuxing frame"));
   // GST_DEBUG_OBJECT (rsdemux, "%s", __FUNCTION__);
+
   /* takes ownership of buffer */
   try 
   {
@@ -489,18 +488,6 @@ gst_rsdemux_demux_frame (GstRSDemux * rsdemux, GstBuffer * buffer)
   return ret;
 }
 
-/* TODO refactor. this function did a lot more in the dvdemux element
- * It can be moved from here
- */
-static GstFlowReturn
-gst_rsdemux_flush_buffer (GstRSDemux * rsdemux, GstBuffer * buffer)
-{
-  GstFlowReturn ret = GST_FLOW_OK;
-  ret = gst_rsdemux_demux_frame (rsdemux, buffer);
-  
-  return ret;
-}
-
 /* flush any remaining data in the adapter, used in chain based scheduling mode */
 static GstFlowReturn
 gst_rsdemux_flush (GstRSDemux * rsdemux)
@@ -515,11 +502,7 @@ gst_rsdemux_chain (GstPad * pad, GstObject * parent, GstBuffer * buffer)
 {
   GstFlowReturn ret;
   auto rsdemux = GST_RSDEMUX (parent);
-
-  /* FIXME a timestamp always should be respected */
-  // timestamp = GST_BUFFER_TIMESTAMP (buffer);
-
-  ret = gst_rsdemux_flush_buffer (rsdemux, buffer);
+  ret = gst_rsdemux_demux_frame(rsdemux, buffer);
 
   return ret;
 }
