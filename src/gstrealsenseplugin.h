@@ -12,6 +12,9 @@
 
 #include <librealsense2/rs.hpp>
 
+// #include "rsmux.hpp"
+#include "common.hpp"
+
 G_BEGIN_DECLS
 
 /* #defines don't like whitespacey bits */
@@ -32,31 +35,6 @@ typedef struct _GstRealsenseSrcClass GstRealsenseSrcClass;
 using rs_pipe_ptr = std::unique_ptr<rs2::pipeline>;
 using rs_aligner_ptr = std::unique_ptr<rs2::align>;
 constexpr const auto DEFAULT_PROP_CAM_SN = 0;
-
-enum Align
-{
-  None,
-  Color,
-  Depth
-};
-
-enum StreamType
-{
-  StreamColor,
-  StreamDepth,
-  StreamMux // Color and depth crammed into the same buffer
-};
-
-struct RSHeader {
-  gint color_height;
-  gint color_width;
-  gint color_stride;
-  GstVideoFormat color_format;
-  gint depth_height;
-  gint depth_width;
-  gint depth_stride;
-  GstVideoFormat depth_format;
-};
 
 struct _GstRealsenseSrc
 {

@@ -66,6 +66,8 @@
 #include "gstrealsenseplugin.h"
 #include "gstrealsensedemux.h"
 
+#include "rsmux.hpp"
+
 GST_DEBUG_CATEGORY_STATIC (gst_realsense_src_debug);
 #define GST_CAT_DEFAULT gst_realsense_src_debug
 
@@ -246,18 +248,12 @@ gst_realsense_src_get_property (GObject * object, guint prop_id, GValue * value,
 static GstBuffer *
 gst_realsense_src_create_buffer_from_frameset (GstRealsenseSrc * src, rs2::frameset& frame_set)
 {
-  GstMapInfo minfo;
   GstBuffer *buf;
 
   auto cframe = frame_set.get_color_frame();
-  auto color_sz = cframe.get_height() * src->gst_stride;
   auto depth = frame_set.get_depth_frame();
-  auto depth_sz = depth.get_data_size();
-  constexpr auto header_sz = sizeof(RSHeader);
-  /* TODO: use allocator or use from pool if that's more efficient or safer*/
-  buf = gst_buffer_new_and_alloc (header_sz + color_sz + depth_sz);
 
-  auto header = RSHeader {
+  auto header = RSHeader{
     cframe.get_height(),
     cframe.get_width(),
     src->gst_stride,
@@ -267,74 +263,11 @@ gst_realsense_src_create_buffer_from_frameset (GstRealsenseSrc * src, rs2::frame
     depth.get_stride_in_bytes(),
     GST_VIDEO_FORMAT_GRAY16_LE //FIXME could be _LE or _BE
   };
-  gst_buffer_map (buf, &minfo, GST_MAP_WRITE);
-  GST_LOG_OBJECT (src,
-      "GstBuffer size=%lu, gst_stride=%d, frame_num=%llu",
-      minfo.size, src->gst_stride, cframe.get_frame_number());
-  GST_LOG_OBJECT (src, "Buffer timestamp %f", cframe.get_timestamp());
-
-  memcpy(minfo.data, &header, sizeof(header));
-
-  // TODO refactor this section into cleaner code
-  int rs_stride = 0;
-  if(src->stream_type == StreamType::StreamColor || src->stream_type == StreamType::StreamMux) 
-  {
-    auto outdata = minfo.data + sizeof(RSHeader);
-    rs_stride = cframe.get_stride_in_bytes();
-      /* TODO: use orc_memcpy */
-    if (src->gst_stride == rs_stride) 
-    {
-      memcpy (outdata, ((guint8 *) cframe.get_data()), color_sz);
-      outdata += color_sz;
-    } 
-    else 
-    {
-      int i;
-      GST_LOG_OBJECT (src, "Image strides not identical, copy will be slower.");
-      for (i = 0; i < src->height; i++) 
-      {
-        memcpy (outdata,
-            ((guint8 *) cframe.get_data()) + i * rs_stride, 
-            rs_stride);
-        outdata += src->gst_stride;
-      }
-    }
-
-    // Just cram the depth data into the buffer. We can write a filter to 
-    // separate RGB and Depth, or consuming elements can do this themselves
-    if(src->stream_type == StreamType::StreamMux)
-    {
-
-      memcpy(outdata, depth.get_data(), depth_sz);
-    }
-  }
-  else //implied src->stream_type == StreamType::Depth
-  {
-    rs_stride = depth.get_stride_in_bytes();
-      /* TODO: use orc_memcpy */
-    auto outdata = minfo.data + sizeof(RSHeader);
-    if (src->gst_stride == rs_stride) 
-    {
-      memcpy (outdata, ((guint8 *) depth.get_data()), depth_sz);
-    } 
-    else 
-    {
-      int i;
-      GST_LOG_OBJECT (src, "Image strides not identical, copy will be slower.");
-      for (i = 0; i < src->height; i++) 
-      {
-        memcpy (outdata,
-            ((guint8 *) depth.get_data()) + i * rs_stride,
-            rs_stride);
-        minfo.data += src->gst_stride;
-      }
-    }
-  }
   
+  gst_element_post_message(GST_ELEMENT_CAST(src), 
+    gst_message_new_info(GST_OBJECT_CAST(src), NULL, "muxing data into GstBuffer"));
 
-  gst_buffer_unmap (buf, &minfo);
-
-  return buf;
+  return RSMux::mux(frame_set, header, src);
 }
 
 static GstFlowReturn
@@ -344,6 +277,8 @@ gst_realsense_src_create (GstPushSrc * psrc, GstBuffer ** buf)
   
   GST_LOG_OBJECT (src, "create");
 
+  gst_element_post_message(GST_ELEMENT_CAST(src), 
+    gst_message_new_info(GST_OBJECT_CAST(src), NULL, "creating frame buffer"));
   /* wait for next frame to be available */
   try 
   {
@@ -351,17 +286,23 @@ gst_realsense_src_create (GstPushSrc * psrc, GstBuffer ** buf)
     if(src->aligner != nullptr)
       src->aligner->process(frame_set);
     
-    const auto clock = gst_element_get_clock (GST_ELEMENT (src));
-    const auto clock_time = gst_clock_get_time (clock);
-    gst_object_unref (clock);
+    gst_element_post_message(GST_ELEMENT_CAST(src), 
+      gst_message_new_info(GST_OBJECT_CAST(src), NULL, "received frame from realsense"));
 
     /* create GstBuffer then release */
     *buf = gst_realsense_src_create_buffer_from_frameset(src, frame_set);
 
+    gst_element_post_message(GST_ELEMENT_CAST(src),
+      gst_message_new_info(GST_OBJECT_CAST(src), NULL, "setting timestamp."));
+    
+    const auto clock = gst_element_get_clock (GST_ELEMENT (src));
+    const auto clock_time = gst_clock_get_time (clock);
     GST_BUFFER_TIMESTAMP (*buf) =
         GST_CLOCK_DIFF (gst_element_get_base_time (GST_ELEMENT (src)),
         clock_time);
     GST_BUFFER_OFFSET (*buf) = frame_set.get_frame_number();
+    gst_object_unref (clock);
+
   }
   catch (rs2::error & e)
   {
@@ -379,6 +320,9 @@ gst_realsense_src_create (GstPushSrc * psrc, GstBuffer ** buf)
   //   }
   //   return GST_FLOW_FLUSHING;
   // }
+
+  gst_element_post_message(GST_ELEMENT_CAST(src),
+    gst_message_new_info(GST_OBJECT_CAST(src), NULL, "create method done"));
 
   return GST_FLOW_OK;
 }

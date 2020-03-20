@@ -25,6 +25,7 @@
 #include "gstrealsensedemux.h"
 #include "gstrealsenseplugin.h"
 
+#include "rsmux.hpp"
 #include <stdexcept>
 
 GST_DEBUG_CATEGORY_STATIC (rsdemux_debug);
@@ -201,13 +202,6 @@ gst_rsdemux_remove_pads (GstRSDemux * rsdemux)
     gst_element_remove_pad (GST_ELEMENT (rsdemux), rsdemux->depthsrcpad);
     rsdemux->depthsrcpad = NULL;
   }
-  
-#if AUDIO_SRC
-  if (rsdemux->audiosrcpad) {
-    gst_element_remove_pad (GST_ELEMENT (rsdemux), rsdemux->audiosrcpad);
-    rsdemux->audiosrcpad = NULL;
-  }
-#endif  
 }
 
 static gboolean
@@ -338,30 +332,6 @@ gst_rsdemux_handle_src_event (GstPad * pad, GstObject * parent,
   return res;
   }
 
-RSHeader GetRSHeader(GstRSDemux* src, GstBuffer* buffer)
-{
-  gst_element_post_message(GST_ELEMENT_CAST(src), 
-          gst_message_new_info(GST_OBJECT_CAST(src), NULL, "extracting header"));
-  RSHeader header;
-  RSHeader* in;
-  GstMapInfo map;
-  gst_buffer_map(buffer, &map, GST_MAP_READ);
-  in = reinterpret_cast<RSHeader*>(map.data);
-
-  header.color_height = in->color_height;
-  header.color_width = in->color_width;
-  header.color_stride = in->color_stride;
-  header.color_format = in->color_format;
-  header.depth_height = in->depth_height;
-  header.depth_width = in->depth_width;
-  header.depth_stride = in->depth_stride;
-  header.depth_format = in->depth_format;
-  
-  gst_buffer_unmap(buffer, &map);
-
-  return header;
-}
-
 /* takes ownership of buffer FIXME */
 static GstFlowReturn
 gst_rsdemux_demux_video (GstRSDemux * rsdemux, GstBuffer * buffer)
@@ -369,7 +339,7 @@ gst_rsdemux_demux_video (GstRSDemux * rsdemux, GstBuffer * buffer)
   GstFlowReturn ret = GST_FLOW_OK;
   GST_DEBUG ("Demuxing video frame");
   
-  const auto header = GetRSHeader(rsdemux, buffer);
+  const auto header = RSMux::GetRSHeader(rsdemux, buffer);
 
   // see if anything changed 
   if (G_UNLIKELY (rsdemux->colorsrcpad == nullptr) || (rsdemux->in_stride_bytes != header.color_stride)) //|| (rsdemux->in_height != header.color_height))
@@ -418,34 +388,8 @@ gst_rsdemux_demux_video (GstRSDemux * rsdemux, GstBuffer * buffer)
   /* takes ownership of buffer here, we just need to modify
    * the metadata. */
   // outbuf = gst_buffer_make_writable (buffer);
-  GstMapInfo inmap, cmap, dmap;
-  gst_buffer_map(buffer, &inmap, GST_MAP_READ);
-  
-  gst_element_post_message(GST_ELEMENT_CAST(rsdemux), 
-        gst_message_new_info(GST_OBJECT_CAST(rsdemux), NULL, "copying color buffer to src pad"));
+  auto [colorbuf, depthbuf] = RSMux::demux(buffer, header);
 
-  auto color_sz = header.color_height * header.color_stride;
-  auto colorbuf = gst_buffer_new_and_alloc( color_sz);
-  gst_buffer_map(colorbuf, &cmap, GST_MAP_WRITE);
-  auto cdata = inmap.data + sizeof(RSHeader);
-  memcpy(cmap.data, cdata, color_sz);
-
-  gst_element_post_message(GST_ELEMENT_CAST(rsdemux), 
-        gst_message_new_info(GST_OBJECT_CAST(rsdemux), NULL, "copying depth buffer to src pad"));
-
-  auto depth_sz = header.depth_height * header.depth_stride;
-  auto depthbuf = gst_buffer_new_and_alloc( depth_sz);
-  gst_buffer_map(depthbuf, &dmap, GST_MAP_WRITE);
-  auto ddata = cdata + color_sz;
-  memcpy(dmap.data, ddata, depth_sz);
-
-  GST_BUFFER_TIMESTAMP (colorbuf) = GST_BUFFER_TIMESTAMP(buffer);
-  GST_BUFFER_TIMESTAMP (depthbuf) = GST_BUFFER_TIMESTAMP(buffer);
-
-  gst_buffer_unmap(buffer, &inmap);
-  gst_buffer_unmap(colorbuf, &cmap);
-  gst_buffer_unmap(depthbuf, &dmap);
-  
   gst_element_post_message(GST_ELEMENT_CAST(rsdemux), 
     gst_message_new_info(GST_OBJECT_CAST(rsdemux), NULL, "pushing buffers"));
         
