@@ -248,8 +248,6 @@ gst_realsense_src_get_property (GObject * object, guint prop_id, GValue * value,
 static GstBuffer *
 gst_realsense_src_create_buffer_from_frameset (GstRealsenseSrc * src, rs2::frameset& frame_set)
 {
-  GstBuffer *buf;
-
   auto cframe = frame_set.get_color_frame();
   auto depth = frame_set.get_depth_frame();
 

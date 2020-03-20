@@ -23,7 +23,7 @@ plugin_sources = [
 
 gstpluginexample = library('gstrealsensesrc',
   plugin_sources,
-  cpp_args: plugin_cpp_args,
+  cpp_args: [plugin_cpp_args, '-std=c++1z'],
   dependencies : [gst_dep, gstvideo_dep, realsense_dep],
   install : true,
   install_dir : plugins_install_dir,
