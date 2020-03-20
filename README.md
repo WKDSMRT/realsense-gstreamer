@@ -18,15 +18,9 @@ D435i is currently supported.
 ### Source
 - Add metadata
 - Test alignment property
-    - Something is coming thru. Need demuxer to see data
-- Add Depth channel
-    - I've attempted to extend the output buffer and pack the depth data into that buffer. The consumer will need to unpack it. The format, frame size, stride for color and depth will need to be passed thru the pipeline 
+    - test all alignment configs
 - Add IMU data
-- src/gstrealsensedemux.h:34:// TODO put encode/decode all in a single file/class
-- src/gstrealsenseplugin.cpp:87:// TODO update formats
-- src/gstrealsenseplugin.cpp:208:    // TODO properties
 - src/gstrealsenseplugin.cpp:257:  /* TODO: use allocator or use from pool if that's more efficient or safer*/
-- src/gstrealsenseplugin.cpp:278:  // TODO refactor this section into cleaner code
 - src/gstrealsenseplugin.cpp:284:      /* TODO: use orc_memcpy */
 - src/gstrealsenseplugin.cpp:314:      /* TODO: use orc_memcpy */
 - src/gstrealsensedemux.cpp:219:  // TODO Handle any necessary src queries

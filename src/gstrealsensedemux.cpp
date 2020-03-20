@@ -276,8 +276,6 @@ gst_rsdemux_handle_sink_event (GstPad * pad, GstObject * parent,
       res = gst_rsdemux_push_event (rsdemux, event);
       break;
     case GST_EVENT_FLUSH_STOP:
-      //  TODO gst_adapter_clear (rsdemux->adapter);
-      // GST_DEBUG ("cleared adapter");
       res = gst_rsdemux_push_event (rsdemux, event);
       break;
     case GST_EVENT_EOS:

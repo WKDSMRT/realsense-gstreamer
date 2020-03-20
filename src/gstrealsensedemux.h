@@ -31,9 +31,6 @@ struct _GstRSDemux {
   GstPad        *colorsrcpad = nullptr;
   GstPad        *depthsrcpad = nullptr;
 
-// TODO put encode/decode all in a single file/class
-// dv_decoder_t  *decoder;
-
   /* video params */
   gint           in_height;
   gint           in_width;
