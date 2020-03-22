@@ -87,8 +87,6 @@ static GstFlowReturn gst_rsdemux_chain (GstPad * pad, GstObject * parent,
 /* state change functions */
 static gboolean gst_rsdemux_sink_activate (GstPad * sinkpad,
     GstObject * parent);
-static gboolean gst_rsdemux_sink_activate_mode (GstPad * sinkpad,
-    GstObject * parent, GstPadMode mode, gboolean active);
 static GstStateChangeReturn gst_rsdemux_change_state (GstElement * element,
     GstStateChange transition);
 
@@ -125,8 +123,6 @@ gst_rsdemux_init (GstRSDemux * rsdemux)
   /* we can operate in pull and push mode so we install
    * a custom activate function */
   gst_pad_set_activate_function (rsdemux->sinkpad, GST_DEBUG_FUNCPTR (gst_rsdemux_sink_activate));
-  /* the function to activate in push mode */
-  gst_pad_set_activatemode_function (rsdemux->sinkpad, GST_DEBUG_FUNCPTR (gst_rsdemux_sink_activate_mode));
   /* for push mode, this is the chain function */
   gst_pad_set_chain_function (rsdemux->sinkpad, GST_DEBUG_FUNCPTR (gst_rsdemux_chain));
   /* handling events (in push mode only) */
@@ -447,32 +443,6 @@ gst_rsdemux_chain (GstPad * pad, GstObject * parent, GstBuffer * buffer)
   ret = gst_rsdemux_demux_frame(rsdemux, buffer);
 
   return ret;
-}
-
-// FIXME looks like we don't need this
-static gboolean
-gst_rsdemux_sink_activate_mode (GstPad * sinkpad, GstObject * parent,
-    GstPadMode mode, gboolean active)
-{
-  gboolean res;
-  GstRSDemux *demux = GST_RSDEMUX (parent);
-
-  switch (mode) {
-    case GST_PAD_MODE_PUSH:
-      if (active) {
-        GST_DEBUG_OBJECT (demux, "activating push/chain function");
-        // demux->seek_handler = gst_rsdemux_handle_push_seek;
-      } else {
-        GST_DEBUG_OBJECT (demux, "deactivating push/chain function");
-        // demux->seek_handler = NULL;
-      }
-      res = TRUE;
-      break;
-    default:
-      res = FALSE;
-      break;
-  }
-  return res;
 }
 
 /* FIXME decide on push or pull based scheduling */
