@@ -12,7 +12,6 @@
 
 #include <librealsense2/rs.hpp>
 
-// #include "rsmux.hpp"
 #include "common.hpp"
 
 G_BEGIN_DECLS
