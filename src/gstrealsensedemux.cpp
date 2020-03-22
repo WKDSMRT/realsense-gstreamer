@@ -14,6 +14,8 @@
  * This pipeline captures realsense stream, demuxes it to color and depth
  * and renders them to videosinks.
  *
+ * TODO
+ * - Clean up log/debug/info messages
  */
 
 #ifdef HAVE_CONFIG_H
@@ -85,8 +87,6 @@ static GstFlowReturn gst_rsdemux_chain (GstPad * pad, GstObject * parent,
     GstBuffer * buffer);
 
 /* state change functions */
-static gboolean gst_rsdemux_sink_activate (GstPad * sinkpad,
-    GstObject * parent);
 static GstStateChangeReturn gst_rsdemux_change_state (GstElement * element,
     GstStateChange transition);
 
@@ -120,9 +120,6 @@ static void
 gst_rsdemux_init (GstRSDemux * rsdemux)
 {
   rsdemux->sinkpad = gst_pad_new_from_static_template (&sink_tmpl, "sink");
-  /* we can operate in pull and push mode so we install
-   * a custom activate function */
-  gst_pad_set_activate_function (rsdemux->sinkpad, GST_DEBUG_FUNCPTR (gst_rsdemux_sink_activate));
   /* for push mode, this is the chain function */
   gst_pad_set_chain_function (rsdemux->sinkpad, GST_DEBUG_FUNCPTR (gst_rsdemux_chain));
   /* handling events (in push mode only) */
@@ -426,7 +423,6 @@ gst_rsdemux_demux_frame (GstRSDemux * rsdemux, GstBuffer * buffer)
   return ret;
 }
 
-/* flush any remaining data in the adapter, used in chain based scheduling mode */
 static GstFlowReturn
 gst_rsdemux_flush (GstRSDemux * rsdemux)
 {
@@ -443,37 +439,6 @@ gst_rsdemux_chain (GstPad * pad, GstObject * parent, GstBuffer * buffer)
   ret = gst_rsdemux_demux_frame(rsdemux, buffer);
 
   return ret;
-}
-
-/* FIXME decide on push or pull based scheduling */
-static gboolean
-gst_rsdemux_sink_activate (GstPad * sinkpad, GstObject * parent)
-{
-  GstQuery *query;
-  gboolean pull_mode;
-
-  query = gst_query_new_scheduling ();
-
-  if (!gst_pad_peer_query (sinkpad, query)) {
-    gst_query_unref (query);
-    goto activate_push;
-  }
-
-  pull_mode = gst_query_has_scheduling_mode_with_flags (query,
-      GST_PAD_MODE_PULL, GST_SCHEDULING_FLAG_SEEKABLE);
-  gst_query_unref (query);
-
-  if (!pull_mode)
-    goto activate_push;
-
-  GST_DEBUG_OBJECT (sinkpad, "activating pull");
-  return gst_pad_activate_mode (sinkpad, GST_PAD_MODE_PULL, TRUE);
-
-activate_push:
-  {
-    GST_DEBUG_OBJECT (sinkpad, "activating push");
-    return gst_pad_activate_mode (sinkpad, GST_PAD_MODE_PUSH, TRUE);
-  }
 }
 
 static GstStateChangeReturn
