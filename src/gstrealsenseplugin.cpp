@@ -236,7 +236,7 @@ gst_realsense_src_create (GstPushSrc * psrc, GstBuffer ** buf)
   {
     auto frame_set = src->rs_pipeline->wait_for_frames();
     if(src->aligner != nullptr)
-      src->aligner->process(frame_set);
+      frame_set = src->aligner->process(frame_set);
     
     gst_element_post_message(GST_ELEMENT_CAST(src), 
       gst_message_new_info(GST_OBJECT_CAST(src), NULL, "received frame from realsense"));
@@ -361,7 +361,7 @@ gst_realsense_src_start (GstBaseSrc * basesrc)
 
       auto frame_set = src->rs_pipeline->wait_for_frames();
       if(src->aligner != nullptr)
-        src->aligner->process(frame_set);
+        frame_set = src->aligner->process(frame_set);
       
       int height = 0;
       int width = 0;
