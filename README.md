@@ -18,30 +18,18 @@ D435i is currently supported.
 ### Source
 - Add metadata
 - Test alignment property
-    - test all alignment configs
+    - Mostly works. See known issue below.
 - Add IMU data
 - src/gstrealsenseplugin.cpp:257:  /* TODO: use allocator or use from pool if that's more efficient or safer*/
 - src/gstrealsenseplugin.cpp:284:      /* TODO: use orc_memcpy */
 - src/gstrealsenseplugin.cpp:314:      /* TODO: use orc_memcpy */
 - src/gstrealsensedemux.cpp:219:  // TODO Handle any necessary src queries
 - src/gstrealsensedemux.cpp:235:  // TODO Handle any sink queries
-- src/gstrealsensedemux.cpp:286:      //  TODO gst_adapter_clear (rsdemux->adapter);
 - src/gstrealsensedemux.cpp:333:    // TODO handle src pad events here
-- src/gstrealsensedemux.cpp:419:  // TODO create colorbuf and depth buf and fill them
-- src/gstrealsensedemux.cpp:444:  // TODO What is duration? some sort of timestamp?
-- src/gstrealsensedemux.cpp:492:/* TODO refactor. this function did a lot more in the dvdemux element
 - src/gstrealsensedemux.cpp:508:  // TODO What do we need to do in _flush?
-- src/gstrealsenseplugin.cpp:49: * FIXME:Describe realsensesrc here.
-- src/gstrealsenseplugin.cpp:140:    "FIXME:Generic",
-- src/gstrealsenseplugin.cpp:141:    "FIXME:Generic Template Element",
 - src/gstrealsenseplugin.cpp:264:    src->info.finfo->format, // FIXME won't be correct if we only have depth
 - src/gstrealsenseplugin.cpp:268:    GST_VIDEO_FORMAT_GRAY16_LE //FIXME could be _LE or _BE
 - src/gstrealsenseplugin.cpp:530:          // FIXME Not exact format match
-- src/gstrealsensedemux.cpp:114:      "RealSense Source Demuxer", "FIXME:Demuxer",
-- src/gstrealsensedemux.cpp:366:/* takes ownership of buffer FIXME */
-- src/gstrealsensedemux.cpp:519:  /* FIXME a timestamp always should be respected */
-- src/gstrealsensedemux.cpp:527:// FIXME looks like we don't need this
-- src/gstrealsensedemux.cpp:553:/* FIXME decide on push or pull based scheduling */
 - set plugin defines specific to WKD.SMRT/RealSense
 - Maybe add capability to generate synthetic data if no camera is connected.
     - Should be develop mode only
@@ -67,3 +55,4 @@ export GST_PLUGIN_PATH
 (gst-inspect-1.0:24981): GStreamer-WARNING **: 20:31:47.666: Element factory metadata for 'realsensesrc' has no valid klass field
 Could not load plugin file: File "mbuild/src/libgstrealsensesrc.so" appears to be a GStreamer plugin, but it failed to initialize
 ```
+- When aligning to the depth frame, some areas of rgb frame are blacked out. It's not clear with this is a RealSense bug or problem with the plugins. 

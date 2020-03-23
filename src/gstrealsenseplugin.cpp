@@ -209,11 +209,11 @@ gst_realsense_src_create_buffer_from_frameset (GstRealsenseSrc * src, rs2::frame
     cframe.get_height(),
     cframe.get_width(),
     src->gst_stride,
-    src->info.finfo->format, // FIXME won't be correct if we only have depth
+    src->color_format,
     depth.get_height(),
     depth.get_width(),
     depth.get_stride_in_bytes(),
-    GST_VIDEO_FORMAT_GRAY16_LE //FIXME could be _LE or _BE
+    src->depth_format
   };
   
   gst_element_post_message(GST_ELEMENT_CAST(src), 
@@ -277,6 +277,36 @@ gst_realsense_src_create (GstPushSrc * psrc, GstBuffer ** buf)
     gst_message_new_info(GST_OBJECT_CAST(src), NULL, "create method done"));
 
   return GST_FLOW_OK;
+}
+
+static GstVideoFormat RS_to_Gst_Format(rs2_format fmt)
+{
+  switch(fmt){
+        case RS2_FORMAT_RGB8:
+          return GST_VIDEO_FORMAT_RGB;
+        case RS2_FORMAT_BGR8:
+          return GST_VIDEO_FORMAT_BGR;
+        case RS2_FORMAT_RGBA8:
+          return GST_VIDEO_FORMAT_RGBA;
+        case RS2_FORMAT_BGRA8:
+          return GST_VIDEO_FORMAT_BGRA;
+        case RS2_FORMAT_Z16:
+        case RS2_FORMAT_RAW16:
+        case RS2_FORMAT_Y16:
+          if (G_BYTE_ORDER == G_LITTLE_ENDIAN) 
+          {
+            return GST_VIDEO_FORMAT_GRAY16_LE;
+          } 
+          else if (G_BYTE_ORDER == G_BIG_ENDIAN) 
+          {
+            return GST_VIDEO_FORMAT_GRAY16_BE;
+          }
+        case RS2_FORMAT_YUYV:
+          // FIXME Not exact format match
+          return GST_VIDEO_FORMAT_YVYU;
+        default:
+          return GST_VIDEO_FORMAT_UNKNOWN;
+      }
 }
 
 static gboolean
@@ -365,13 +395,14 @@ gst_realsense_src_start (GstBaseSrc * basesrc)
       
       int height = 0;
       int width = 0;
-      rs2_format rs_format = RS2_FORMAT_COUNT;
+      GstVideoFormat fmt = GST_VIDEO_FORMAT_UNKNOWN;
       if(src->stream_type == StreamType::StreamColor)
       {
         auto cframe = frame_set.get_color_frame();
         height = cframe.get_height();
         width = cframe.get_width();
-        rs_format = cframe.get_profile().format();
+        src->color_format = RS_to_Gst_Format(cframe.get_profile().format());
+        fmt = src->color_format;
         // rs2_frame_metadata_value
         // auto raw_rs_size = vf.get_frame_metadata(RS2_FRAME_METADATA_RAW_FRAME_SIZE);
       }
@@ -380,7 +411,8 @@ gst_realsense_src_start (GstBaseSrc * basesrc)
         auto depth = frame_set.get_depth_frame();
         height = depth.get_height();
         width = depth.get_width();
-        rs_format = depth.get_profile().format();
+        src->depth_format = RS_to_Gst_Format(depth.get_profile().format());
+        fmt = src->depth_format;
       }
       else if(src->stream_type == StreamType::StreamMux)
       {
@@ -389,48 +421,21 @@ gst_realsense_src_start (GstBaseSrc * basesrc)
 
         height = cframe.get_height();
         width = cframe.get_width();
-        rs_format = cframe.get_profile().format();
+        src->depth_format = RS_to_Gst_Format(depth.get_profile().format());
+        src->color_format = RS_to_Gst_Format(cframe.get_profile().format());
 
         auto depth_height = depth.get_height();
         height += (depth_height * depth.get_stride_in_bytes()) / cframe.get_stride_in_bytes();
+        fmt = src->color_format;
       }
 
       gst_video_info_init(&src->info);
+      
+      if(fmt ==GST_VIDEO_FORMAT_UNKNOWN)
+        GST_ELEMENT_ERROR (src, RESOURCE, FAILED, ("Unhandled RealSense format %d", fmt), (NULL));
 
-      switch(rs_format){
-        case RS2_FORMAT_RGB8:
-          gst_video_info_set_format(&src->info, GST_VIDEO_FORMAT_RGB, width, height);
-          break;
-        case RS2_FORMAT_BGR8:
-          gst_video_info_set_format(&src->info, GST_VIDEO_FORMAT_BGR, width, height);
-          break;
-        case RS2_FORMAT_RGBA8:
-          gst_video_info_set_format(&src->info, GST_VIDEO_FORMAT_RGBA, width, height);
-          break;
-        case RS2_FORMAT_BGRA8:
-          gst_video_info_set_format(&src->info, GST_VIDEO_FORMAT_BGRA, width, height);
-          break;
-        case RS2_FORMAT_Z16:
-        case RS2_FORMAT_RAW16:
-        case RS2_FORMAT_Y16:
-          if (G_BYTE_ORDER == G_LITTLE_ENDIAN) 
-          {
-            gst_video_info_set_format (&src->info, GST_VIDEO_FORMAT_GRAY16_LE, width, height);
-          } 
-          else if (G_BYTE_ORDER == G_BIG_ENDIAN) 
-          {
-            gst_video_info_set_format (&src->info, GST_VIDEO_FORMAT_GRAY16_BE, width, height);
-          }
-          break;
-        case RS2_FORMAT_YUYV:
-          // FIXME Not exact format match
-          gst_video_info_set_format(&src->info, GST_VIDEO_FORMAT_YVYU, width, height);
-          break;
-        default:
-          gst_video_info_set_format(&src->info, GST_VIDEO_FORMAT_UNKNOWN, width, height);
-          GST_ELEMENT_ERROR (src, RESOURCE, FAILED, ("Unhandled RealSense format %d", rs_format), (NULL));
-          // GST_LOG_OBJECT(src, "Unhandled RealSense format %d", rs_format);
-      }
+      gst_video_info_set_format(&src->info, fmt, width, height);
+
       src->caps = gst_video_info_to_caps (&src->info);
   }
   catch (rs2::error & e)

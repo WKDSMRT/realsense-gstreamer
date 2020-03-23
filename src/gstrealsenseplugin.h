@@ -46,7 +46,9 @@ struct _GstRealsenseSrc
   GstCaps *caps;
   gint height;
   gint gst_stride;
-  
+  GstVideoFormat color_format = GST_VIDEO_FORMAT_UNKNOWN;
+  GstVideoFormat depth_format = GST_VIDEO_FORMAT_UNKNOWN;
+
   // Realsense vars
   rs_pipe_ptr rs_pipeline = nullptr;
   rs_aligner_ptr aligner = nullptr;
