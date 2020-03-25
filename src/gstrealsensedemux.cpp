@@ -322,8 +322,7 @@ static GstFlowReturn make_new_pads(GstRSDemux* rsdemux, const RSHeader& header)
 {
   rsdemux->header = header;
 
-  gst_element_post_message(GST_ELEMENT_CAST(rsdemux), 
-    gst_message_new_info(GST_OBJECT_CAST(rsdemux), NULL, "making pad caps"));
+  GST_CAT_DEBUG(rsdemux_debug, "making pad caps");
 
   auto color_caps = gst_caps_new_simple ("video/x-raw",
         "format", G_TYPE_STRING, "RGB",
@@ -338,12 +337,11 @@ static GstFlowReturn make_new_pads(GstRSDemux* rsdemux, const RSHeader& header)
         "framerate", GST_TYPE_FRACTION, 30, 1,
         NULL);
 
-  gst_element_post_message(GST_ELEMENT_CAST(rsdemux), 
-    gst_message_new_info(GST_OBJECT_CAST(rsdemux), NULL, "made pad caps"));
+  GST_CAT_DEBUG(rsdemux_debug, "made pad caps");
+
   if (G_UNLIKELY (rsdemux->colorsrcpad == nullptr) || G_UNLIKELY(rsdemux->depthsrcpad==nullptr)) 
   {
-    gst_element_post_message(GST_ELEMENT_CAST(rsdemux), 
-      gst_message_new_info(GST_OBJECT_CAST(rsdemux), NULL, "adding pads"));
+    GST_CAT_DEBUG(rsdemux_debug, "adding pads");
 
     rsdemux->colorsrcpad = gst_rsdemux_add_pad (rsdemux, &color_src_tmpl, color_caps);
     rsdemux->depthsrcpad = gst_rsdemux_add_pad (rsdemux, &depth_src_tmpl, depth_caps);
@@ -385,8 +383,7 @@ gst_rsdemux_demux_video (GstRSDemux * rsdemux, GstBuffer * buffer)
   // outbuf = gst_buffer_make_writable (buffer);
   auto [colorbuf, depthbuf] = RSMux::demux(buffer, header);
 
-  gst_element_post_message(GST_ELEMENT_CAST(rsdemux), 
-    gst_message_new_info(GST_OBJECT_CAST(rsdemux), NULL, "pushing buffers"));
+  GST_CAT_DEBUG(rsdemux_debug, "pushing buffers");
         
   ret = gst_pad_push (rsdemux->colorsrcpad, colorbuf);
   ret = gst_pad_push (rsdemux->depthsrcpad, depthbuf);
@@ -402,9 +399,7 @@ gst_rsdemux_demux_frame (GstRSDemux * rsdemux, GstBuffer * buffer)
   
   rsdemux->frame_count++;
   
-  gst_element_post_message(GST_ELEMENT_CAST(rsdemux), 
-            gst_message_new_info(GST_OBJECT_CAST(rsdemux), NULL, "demuxing frame"));
-  // GST_DEBUG_OBJECT (rsdemux, "%s", __FUNCTION__);
+  GST_CAT_DEBUG(rsdemux_debug, "demuxing frame");
 
   /* takes ownership of buffer */
   try 

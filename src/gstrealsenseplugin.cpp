@@ -252,14 +252,12 @@ gst_realsense_src_create (GstPushSrc * psrc, GstBuffer ** buf)
     if(src->aligner != nullptr)
       frame_set = src->aligner->process(frame_set);
     
-    gst_element_post_message(GST_ELEMENT_CAST(src), 
-      gst_message_new_info(GST_OBJECT_CAST(src), NULL, "received frame from realsense"));
+    GST_CAT_DEBUG(gst_realsense_src_debug, "received frame from realsense");
 
     /* create GstBuffer then release */
     *buf = gst_realsense_src_create_buffer_from_frameset(src, frame_set);
 
-    gst_element_post_message(GST_ELEMENT_CAST(src),
-      gst_message_new_info(GST_OBJECT_CAST(src), NULL, "setting timestamp."));
+    GST_CAT_DEBUG(gst_realsense_src_debug, "setting timestamp.");
     
     const auto clock = gst_element_get_clock (GST_ELEMENT (src));
     const auto clock_time = gst_clock_get_time (clock);
@@ -290,8 +288,7 @@ gst_realsense_src_create (GstPushSrc * psrc, GstBuffer ** buf)
   //   return GST_FLOW_FLUSHING;
   // }
 
-  gst_element_post_message(GST_ELEMENT_CAST(src),
-    gst_message_new_info(GST_OBJECT_CAST(src), NULL, "create method done"));
+  GST_CAT_DEBUG(gst_realsense_src_debug, "create method done");
 
   
   return GST_FLOW_OK;
@@ -340,9 +337,6 @@ gst_realsense_src_start (GstBaseSrc * basesrc)
       if(src->rs_pipeline == nullptr)
       {
         GST_ELEMENT_ERROR (src, RESOURCE, FAILED, ("Failed to create RealSense pipeline."), (NULL));
-        // gst_element_post_message (src,
-        //                   GstMessage * message)
-        // GST_ERROR_OBJECT(src, "Failed to create RealSense pipeline");
         return FALSE;
       }
       rs2::config cfg;

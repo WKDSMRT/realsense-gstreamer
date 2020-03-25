@@ -17,10 +17,7 @@ class RSMux
 public:
     template <typename Element>
     static RSHeader GetRSHeader(Element* src, GstBuffer* buffer)
-    {
-        gst_element_post_message(GST_ELEMENT_CAST(src), 
-                gst_message_new_info(GST_OBJECT_CAST(src), NULL, "extracting header"));
-                
+    {               
         RSHeader header;
         RSHeader* in;
         GstMapInfo map;
@@ -57,22 +54,17 @@ public:
         buffer = gst_buffer_new_and_alloc(buffer_sz);
         if (buffer == nullptr)
         {
-            gst_element_post_message(GST_ELEMENT_CAST(src),
-                                     gst_message_new_info(GST_OBJECT_CAST(src), NULL, "failed to allocate buffer"));
+            GST_ELEMENT_ERROR (src, RESOURCE, FAILED, ("failed to allocate buffer"), (NULL));
+            
             throw new std::runtime_error("failed to allocate buffer");
         }
         gst_buffer_map(buffer, &minfo, GST_MAP_WRITE);
 
-        // GST_ELEMENT_WARNING (src, RESOURCE, FAILED,
-        //         ("Specified serial number %lu not found. Using first found device.", src->serial_number),
-        //         (NULL));
         GST_LOG_OBJECT(src,
                        "GstBuffer size=%lu, gst_stride=%d, frame_num=%llu",
                        minfo.size, src->gst_stride, cframe.get_frame_number());
         GST_LOG_OBJECT(src, "Buffer timestamp %f", cframe.get_timestamp());
 
-        gst_element_post_message(GST_ELEMENT_CAST(src),
-                                 gst_message_new_info(GST_OBJECT_CAST(src), NULL, "copying header"));
         memcpy(minfo.data, &header, sizeof(header));
 
         // TODO refactor this section into cleaner code
@@ -84,18 +76,14 @@ public:
         rs_stride = cframe.get_stride_in_bytes();
         /* TODO: use orc_memcpy */
         if (src->gst_stride == rs_stride)
-        // if (color_sz != 0)
         {
-            gst_element_post_message(GST_ELEMENT_CAST(src),
-                                     gst_message_new_info(GST_OBJECT_CAST(src), NULL, "copying color frame"));
             memcpy(outdata, ((guint8 *)cframe.get_data()), color_sz);
             outdata += color_sz;
         }
         else
         {
             int i;
-            gst_element_post_message(GST_ELEMENT_CAST(src),
-                                     gst_message_new_info(GST_OBJECT_CAST(src), NULL, "Image strides not identical, copy will be slower."));
+            GST_INFO_OBJECT(src, "Image strides not identical, copy will be slower.");
             for (i = 0; i < src->height; i++)
             {
                 memcpy(outdata,
@@ -105,17 +93,11 @@ public:
             }
         }
 
-        // if(src->stream_type == StreamType::StreamMux)
         if (depth_sz != 0)
         {
-            gst_element_post_message(GST_ELEMENT_CAST(src),
-                                     gst_message_new_info(GST_OBJECT_CAST(src), NULL,
-                                                          _gst_element_error_printf("copying depth frame. buffer_end=%p, depth end=%p", minfo.data + buffer_sz, outdata + depth_sz)));
             memcpy(outdata, depth.get_data(), depth_sz);
         }
 
-        gst_element_post_message(GST_ELEMENT_CAST(src),
-                                 gst_message_new_info(GST_OBJECT_CAST(src), NULL, "Unmapping buffer"));
         gst_buffer_unmap(buffer, &minfo);
 
         return buffer;
@@ -126,17 +108,11 @@ public:
         GstMapInfo inmap, cmap, dmap;
         gst_buffer_map(buffer, &inmap, GST_MAP_READ);
 
-        // gst_element_post_message(GST_ELEMENT_CAST(rsdemux),
-        //                          gst_message_new_info(GST_OBJECT_CAST(rsdemux), NULL, "copying color buffer to src pad"));
-
         auto color_sz = header.color_height * header.color_stride;
         auto colorbuf = gst_buffer_new_and_alloc(color_sz);
         gst_buffer_map(colorbuf, &cmap, GST_MAP_WRITE);
         auto cdata = inmap.data + sizeof(RSHeader);
         memcpy(cmap.data, cdata, color_sz);
-
-        // gst_element_post_message(GST_ELEMENT_CAST(rsdemux),
-        //                          gst_message_new_info(GST_OBJECT_CAST(rsdemux), NULL, "copying depth buffer to src pad"));
 
         auto depth_sz = header.depth_height * header.depth_stride;
         auto depthbuf = gst_buffer_new_and_alloc(depth_sz);
