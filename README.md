@@ -16,7 +16,12 @@ D435i is currently supported.
 
 ## To Do
 ### Source
+- control debug output and messages
+- Test application
+- Performance metrics 
+    - frame rate in particular
 - Add metadata
+    - What metadata is needed?
 - Test alignment property
     - Mostly works. See known issue below.
 - Add IMU data

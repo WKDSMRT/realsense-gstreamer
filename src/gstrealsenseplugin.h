@@ -48,11 +48,14 @@ struct _GstRealsenseSrc
   gint gst_stride;
   GstVideoFormat color_format = GST_VIDEO_FORMAT_UNKNOWN;
   GstVideoFormat depth_format = GST_VIDEO_FORMAT_UNKNOWN;
+  GstClockTime prev_time = 0;
+  GstClockTime start_time = 0;
+  guint64 frame_count = 0;
 
   // Realsense vars
   rs_pipe_ptr rs_pipeline = nullptr;
   rs_aligner_ptr aligner = nullptr;
-
+  
   // Properties
   Align align = Align::None;
   guint64 serial_number = 0;

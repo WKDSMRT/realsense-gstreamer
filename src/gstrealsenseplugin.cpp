@@ -34,6 +34,8 @@
 GST_DEBUG_CATEGORY_STATIC (gst_realsense_src_debug);
 #define GST_CAT_DEFAULT gst_realsense_src_debug
 
+#define POST_MESSAGE(src, msg) gst_element_post_message(GST_ELEMENT_CAST((src)), gst_message_new_info(GST_OBJECT_CAST((src)), NULL, (msg)))
+
 enum
 {
   PROP_0,
@@ -216,10 +218,22 @@ gst_realsense_src_create_buffer_from_frameset (GstRealsenseSrc * src, rs2::frame
     src->depth_format
   };
   
-  gst_element_post_message(GST_ELEMENT_CAST(src), 
-    gst_message_new_info(GST_OBJECT_CAST(src), NULL, "muxing data into GstBuffer"));
+  GST_CAT_DEBUG(gst_realsense_src_debug, "muxing data into GstBuffer");
 
   return RSMux::mux(frame_set, header, src);
+}
+
+static void calculate_frame_rate(GstRealsenseSrc* src, GstClockTime new_time)
+{
+  constexpr double fpns_to_fps = 1e9;
+
+  const auto tdiff = new_time - src->prev_time;
+  const auto instant_fr = fpns_to_fps * 1.0 / static_cast<double>(tdiff);
+
+  const auto mean_fr = fpns_to_fps * static_cast<double>(src->frame_count) / static_cast<double>(new_time - src->start_time);
+
+  GST_CAT_DEBUG(gst_realsense_src_debug, "New time: %lu, Prev time: %lu, Frame count: %lu", new_time, src->prev_time, src->frame_count);
+  POST_MESSAGE(src, _gst_element_error_printf("Instant frame rate: %.02f, Avg frame rate: %.2f", instant_fr, mean_fr));
 }
 
 static GstFlowReturn
@@ -229,8 +243,8 @@ gst_realsense_src_create (GstPushSrc * psrc, GstBuffer ** buf)
   
   GST_LOG_OBJECT (src, "create");
 
-  gst_element_post_message(GST_ELEMENT_CAST(src), 
-    gst_message_new_info(GST_OBJECT_CAST(src), NULL, "creating frame buffer"));
+  GST_CAT_DEBUG(gst_realsense_src_debug, "creating frame buffer");
+
   /* wait for next frame to be available */
   try 
   {
@@ -255,6 +269,9 @@ gst_realsense_src_create (GstPushSrc * psrc, GstBuffer ** buf)
     GST_BUFFER_OFFSET (*buf) = frame_set.get_frame_number();
     gst_object_unref (clock);
 
+    ++(src->frame_count);
+    calculate_frame_rate(src, clock_time);
+    src->prev_time = clock_time;
   }
   catch (rs2::error & e)
   {
@@ -276,6 +293,7 @@ gst_realsense_src_create (GstPushSrc * psrc, GstBuffer ** buf)
   gst_element_post_message(GST_ELEMENT_CAST(src),
     gst_message_new_info(GST_OBJECT_CAST(src), NULL, "create method done"));
 
+  
   return GST_FLOW_OK;
 }
 
@@ -453,6 +471,8 @@ gst_realsense_src_start (GstBaseSrc * basesrc)
 
   src->height = src->info.height;
   src->gst_stride = GST_VIDEO_INFO_COMP_STRIDE (&src->info, 0);
+  const auto clock = gst_element_get_clock (GST_ELEMENT (src));
+  src->start_time = gst_clock_get_time (clock);
 
   // GST_OBJECT_UNLOCK (src);
 
