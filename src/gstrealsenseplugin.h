@@ -54,6 +54,7 @@ struct _GstRealsenseSrc
   // Realsense vars
   rs_pipe_ptr rs_pipeline = nullptr;
   rs_aligner_ptr aligner = nullptr;
+  bool has_imu = false;
   
   // Properties
   Align align = Align::None;

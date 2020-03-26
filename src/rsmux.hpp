@@ -32,6 +32,8 @@ public:
         header.depth_width = in->depth_width;
         header.depth_stride = in->depth_stride;
         header.depth_format = in->depth_format;
+        header.accel_format = in->accel_format;
+        header.gyro_format = in->gyro_format;
         
         gst_buffer_unmap(buffer, &map);
 
@@ -47,10 +49,14 @@ public:
         auto color_sz = static_cast<size_t>(cframe.get_height() * src->gst_stride);
         auto depth = frame_set.get_depth_frame();
         auto depth_sz = static_cast<size_t>(depth.get_data_size());
+        rs2::motion_frame accel_frame = frame_set.first_or_default(RS2_STREAM_ACCEL);
+        rs2::motion_frame gyro_frame = frame_set.first_or_default(RS2_STREAM_ACCEL);
+        auto accel = accel_frame.get_motion_data();
+        auto imu_sz = accel_frame.get_data_size() + gyro_frame.get_data_size(); // s.b. 24 bytes
         constexpr auto header_sz = sizeof(RSHeader);
 
         /* TODO: use allocator or use from pool if that's more efficient or safer*/
-        const auto buffer_sz = header_sz + color_sz + depth_sz + 1;
+        const auto buffer_sz = header_sz + color_sz + depth_sz + imu_sz + 1;
         buffer = gst_buffer_new_and_alloc(buffer_sz);
         if (buffer == nullptr)
         {
@@ -96,8 +102,16 @@ public:
         if (depth_sz != 0)
         {
             memcpy(outdata, depth.get_data(), depth_sz);
+            outdata += depth_sz;
         }
 
+        if (imu_sz != 0)
+        {
+            memcpy(outdata, accel_frame.get_data(), accel_frame.get_data_size());
+            outdata += accel_frame.get_data_size();
+            memcpy(outdata, gyro_frame.get_data(), gyro_frame.get_data_size());
+            outdata += gyro_frame.get_data_size();
+        }
         gst_buffer_unmap(buffer, &minfo);
 
         return buffer;

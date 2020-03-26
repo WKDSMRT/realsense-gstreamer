@@ -25,6 +25,8 @@ D435i is currently supported.
 - Test alignment property
     - Mostly works. See known issue below.
 - Add IMU data
+    - property to turn on/off
+    - how to pass on from demux? Use an audio src pad?
 - src/gstrealsenseplugin.cpp:257:  /* TODO: use allocator or use from pool if that's more efficient or safer*/
 - src/gstrealsenseplugin.cpp:284:      /* TODO: use orc_memcpy */
 - src/gstrealsenseplugin.cpp:314:      /* TODO: use orc_memcpy */

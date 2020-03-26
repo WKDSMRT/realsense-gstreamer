@@ -24,6 +24,8 @@ struct RSHeader {
   int depth_width;
   int depth_stride;
   int depth_format;
+  int accel_format;
+  int gyro_format;
 
   bool operator!=(const RSHeader &rhs)
   {

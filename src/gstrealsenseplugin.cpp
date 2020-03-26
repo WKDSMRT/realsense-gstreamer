@@ -30,6 +30,7 @@
 #include "gstrealsensedemux.h"
 
 #include "rsmux.hpp"
+#include <cmath>
 
 GST_DEBUG_CATEGORY_STATIC (gst_realsense_src_debug);
 #define GST_CAT_DEFAULT gst_realsense_src_debug
@@ -324,6 +325,31 @@ static GstVideoFormat RS_to_Gst_Format(rs2_format fmt)
       }
 }
 
+/* Adapted from librealsense/example/motion/rs-motion.cpp */
+bool check_imu_is_supported(const rs2::device& dev)
+{
+    bool found_gyro = false;
+    bool found_accel = false;
+    rs2::context ctx;
+    
+    // The same device should support gyro and accel
+    found_gyro = false;
+    found_accel = false;
+    for (auto sensor : dev.query_sensors())
+    {
+        for (auto profile : sensor.get_stream_profiles())
+        {
+            if (profile.stream_type() == RS2_STREAM_GYRO)
+                found_gyro = true;
+
+            if (profile.stream_type() == RS2_STREAM_ACCEL)
+                found_accel = true;
+        }
+    }
+        
+    return found_gyro && found_accel;
+}
+
 static gboolean
 gst_realsense_src_start (GstBaseSrc * basesrc)
 {
@@ -343,7 +369,7 @@ gst_realsense_src_start (GstBaseSrc * basesrc)
       
       rs2::context ctx;
       const auto dev_list = ctx.query_devices();      
-      const auto serial_number = std::to_string(src->serial_number);
+      auto serial_number = std::to_string(src->serial_number);
 
       if(dev_list.size() == 0)
       {
@@ -353,38 +379,40 @@ gst_realsense_src_start (GstBaseSrc * basesrc)
         return FALSE;
       }
 
-      auto val = dev_list.begin();
-      for(; val != dev_list.end(); ++val )
+      if(src->serial_number == DEFAULT_PROP_CAM_SN)
       {
-        if(0 == serial_number.compare(val.operator*().get_info(RS2_CAMERA_INFO_SERIAL_NUMBER)))
+        serial_number = std::string(dev_list[0].get_info(RS2_CAMERA_INFO_SERIAL_NUMBER));
+      }
+      else
+      {
+        auto val = dev_list.begin();
+        for (; val != dev_list.end(); ++val)
         {
-          break;
+          if (0 == serial_number.compare(val.operator*().get_info(RS2_CAMERA_INFO_SERIAL_NUMBER)))
+          {
+            break;
+          }
+        }
+        
+        if (val == dev_list.end())
+        {
+          GST_ELEMENT_WARNING(src, RESOURCE, FAILED,
+                              ("Specified serial number %lu not found. Using first found device.", src->serial_number),
+                              (NULL));
+          serial_number = dev_list[0].get_info(RS2_CAMERA_INFO_SERIAL_NUMBER);
         }
       }
-      
-      // it might be good to split up this logic for clarity
-      if((val == dev_list.end()) || (src->serial_number == DEFAULT_PROP_CAM_SN))
-      {
-        GST_ELEMENT_WARNING (src, RESOURCE, FAILED, 
-          ("Specified serial number %lu not found. Using first found device.", src->serial_number),
-          (NULL));
-        cfg.enable_device(dev_list[0].get_info(RS2_CAMERA_INFO_SERIAL_NUMBER));
-      } 
-      else
-      {          
-        cfg.enable_device(serial_number);
-      }
-      
-      cfg.enable_all_streams();
+
+      cfg.enable_device(serial_number);
+
+      cfg.enable_stream(RS2_STREAM_ACCEL, RS2_FORMAT_MOTION_XYZ32F);      
+      cfg.enable_stream(RS2_STREAM_GYRO, RS2_FORMAT_MOTION_XYZ32F);
+      cfg.enable_stream(RS2_STREAM_COLOR, RS2_FORMAT_RGB8);
+      cfg.enable_stream(RS2_STREAM_DEPTH, RS2_FORMAT_Z16);
       // auto profile = src->rs_pipeline->get_active_profile();
       // auto streams = profile.get_streams();     
       // auto s0 = streams[0].get();
-      
-      // src->running_time = 0;
-      // src->n_frames = 0;
-      // src->accum_frames = 0;
-      // src->accum_rtime = 0;
-      
+           
       switch(src->align)
       {
         case Align::None:
@@ -398,7 +426,10 @@ gst_realsense_src_start (GstBaseSrc * basesrc)
         default:
           GST_ELEMENT_WARNING (src, RESOURCE, SETTINGS, ("Unknown alignment parameter %d", src->align), (NULL));
       }
+
       src->rs_pipeline->start(cfg);
+      src->has_imu = check_imu_is_supported(src->rs_pipeline->get_active_profile().get_device());
+
       GST_LOG_OBJECT(src, "RealSense pipeline started");
 
       auto frame_set = src->rs_pipeline->wait_for_frames();
@@ -415,8 +446,6 @@ gst_realsense_src_start (GstBaseSrc * basesrc)
         width = cframe.get_width();
         src->color_format = RS_to_Gst_Format(cframe.get_profile().format());
         fmt = src->color_format;
-        // rs2_frame_metadata_value
-        // auto raw_rs_size = vf.get_frame_metadata(RS2_FRAME_METADATA_RAW_FRAME_SIZE);
       }
       else if(src->stream_type == StreamType::StreamDepth)
       {
@@ -439,8 +468,14 @@ gst_realsense_src_start (GstBaseSrc * basesrc)
         auto depth_height = depth.get_height();
         height += (depth_height * depth.get_stride_in_bytes()) / cframe.get_stride_in_bytes();
         fmt = src->color_format;
+        if(src->has_imu)
+        {
+          constexpr auto imu_size = 2 * sizeof(rs2_vector);
+          // add enough for imu data
+          height += std::ceil(imu_size / cframe.get_stride_in_bytes()); 
+        }
       }
-
+     
       gst_video_info_init(&src->info);
       
       if(fmt ==GST_VIDEO_FORMAT_UNKNOWN)
