@@ -49,7 +49,6 @@ struct _GstRealsenseSrc
   GstVideoFormat color_format = GST_VIDEO_FORMAT_UNKNOWN;
   GstVideoFormat depth_format = GST_VIDEO_FORMAT_UNKNOWN;
   GstClockTime prev_time = 0;
-  GstClockTime start_time = 0;
   guint64 frame_count = 0;
 
   // Realsense vars

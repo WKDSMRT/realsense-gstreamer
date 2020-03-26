@@ -13,6 +13,6 @@ export GST_DEBUG
 # gst-launch-1.0 -vvv -m realsensesrc stream-type=2 ! videoconvert ! autovideosink
 # gst-launch-1.0 -v -m realsensesrc stream-type=2 align=2 ! videoconvert ! autovideosink
 
-gst-launch-1.0 -vvv -m realsensesrc stream-type=2 align=2 ! rsdemux name=demux \
+gst-launch-1.0 -vvv -m realsensesrc stream-type=2 align=0 ! rsdemux name=demux \
    ! queue ! videoconvert ! autovideosink \
    demux. ! queue ! videoconvert ! autovideosink

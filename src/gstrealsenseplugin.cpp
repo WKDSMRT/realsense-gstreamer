@@ -230,7 +230,7 @@ static void calculate_frame_rate(GstRealsenseSrc* src, GstClockTime new_time)
   const auto tdiff = new_time - src->prev_time;
   const auto instant_fr = fpns_to_fps * 1.0 / static_cast<double>(tdiff);
 
-  const auto mean_fr = fpns_to_fps * static_cast<double>(src->frame_count) / static_cast<double>(new_time - src->start_time);
+  const auto mean_fr = fpns_to_fps * static_cast<double>(src->frame_count) / static_cast<double>(new_time);
 
   GST_CAT_DEBUG(gst_realsense_src_debug, "New time: %lu, Prev time: %lu, Frame count: %lu", new_time, src->prev_time, src->frame_count);
   POST_MESSAGE(src, _gst_element_error_printf("Instant frame rate: %.02f, Avg frame rate: %.2f", instant_fr, mean_fr));
@@ -261,15 +261,15 @@ gst_realsense_src_create (GstPushSrc * psrc, GstBuffer ** buf)
     
     const auto clock = gst_element_get_clock (GST_ELEMENT (src));
     const auto clock_time = gst_clock_get_time (clock);
-    GST_BUFFER_TIMESTAMP (*buf) =
-        GST_CLOCK_DIFF (gst_element_get_base_time (GST_ELEMENT (src)),
-        clock_time);
+    auto tdiff = GST_CLOCK_DIFF (gst_element_get_base_time (GST_ELEMENT (src)), clock_time);
+    GST_BUFFER_TIMESTAMP (*buf) = tdiff;
+        
     GST_BUFFER_OFFSET (*buf) = frame_set.get_frame_number();
     gst_object_unref (clock);
 
     ++(src->frame_count);
-    calculate_frame_rate(src, clock_time);
-    src->prev_time = clock_time;
+    calculate_frame_rate(src, tdiff);
+    src->prev_time = tdiff;
   }
   catch (rs2::error & e)
   {
@@ -465,9 +465,7 @@ gst_realsense_src_start (GstBaseSrc * basesrc)
 
   src->height = src->info.height;
   src->gst_stride = GST_VIDEO_INFO_COMP_STRIDE (&src->info, 0);
-  const auto clock = gst_element_get_clock (GST_ELEMENT (src));
-  src->start_time = gst_clock_get_time (clock);
-
+  
   // GST_OBJECT_UNLOCK (src);
 
   return TRUE;
@@ -477,28 +475,9 @@ static gboolean
 gst_realsense_src_stop (GstBaseSrc * basesrc)
 {
   auto *src = GST_REALSENSESRC (basesrc);
-  // guint i;
-
+  
   if(src->rs_pipeline != nullptr)
     src->rs_pipeline->stop();
-
-  // g_free (src->tmpline);
-  // src->tmpline = NULL;
-  // g_free (src->tmpline2);
-  // src->tmpline2 = NULL;
-  // g_free (src->tmpline_u8);
-  // src->tmpline_u8 = NULL;
-  // g_free (src->tmpline_u16);
-  // src->tmpline_u16 = NULL;
-  // if (src->subsample)
-  //   gst_video_chroma_resample_free (src->subsample);
-  // src->subsample = NULL;
-
-  // for (i = 0; i < src->n_lines; i++)
-  //   g_free (src->lines[i]);
-  // g_free (src->lines);
-  // src->n_lines = 0;
-  // src->lines = NULL;
 
   return TRUE;
 }
