@@ -40,3 +40,6 @@ cmake*/
 # IDE/editor files
 .idea
 .vscode
+
+# Exe output
+*.log
