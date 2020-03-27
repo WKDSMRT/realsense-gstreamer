@@ -30,7 +30,8 @@ struct _GstRSDemux {
   GstPad        *sinkpad;
   GstPad        *colorsrcpad = nullptr;
   GstPad        *depthsrcpad = nullptr;
-
+  GstPad        *imusrcpad = nullptr;
+  
   /* video params */
   RSHeader header;
   gint           in_height;

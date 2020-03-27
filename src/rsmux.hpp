@@ -10,7 +10,7 @@
 
 #include <tuple>
 
-using buf_tuple = std::tuple<GstBuffer*, GstBuffer*>;
+using buf_tuple = std::tuple<GstBuffer*, GstBuffer*, GstBuffer*>;
 
 class RSMux 
 {
@@ -119,7 +119,7 @@ public:
 
     static buf_tuple demux(GstBuffer *buffer, const RSHeader &header)
     {
-        GstMapInfo inmap, cmap, dmap;
+        GstMapInfo inmap, cmap, dmap, imumap;
         gst_buffer_map(buffer, &inmap, GST_MAP_READ);
 
         auto color_sz = header.color_height * header.color_stride;
@@ -134,14 +134,22 @@ public:
         auto ddata = cdata + color_sz;
         memcpy(dmap.data, ddata, depth_sz);
 
+        auto imubuf = gst_buffer_new_and_alloc(depth_sz);
+        gst_buffer_map(imubuf, &imumap, GST_MAP_READ);
+        constexpr auto imu_sz = 2*sizeof(rs2_vector);
+        auto imudata = ddata + depth_sz;
+        memcpy(imumap.data, imudata, imu_sz);
+
         GST_BUFFER_TIMESTAMP(colorbuf) = GST_BUFFER_TIMESTAMP(buffer);
         GST_BUFFER_TIMESTAMP(depthbuf) = GST_BUFFER_TIMESTAMP(buffer);
+        GST_BUFFER_TIMESTAMP(imubuf) = GST_BUFFER_TIMESTAMP(buffer);
 
         gst_buffer_unmap(buffer, &inmap);
         gst_buffer_unmap(colorbuf, &cmap);
         gst_buffer_unmap(depthbuf, &dmap);
+        gst_buffer_unmap(imubuf, &imumap);
 
-        return std::make_tuple(colorbuf, depthbuf);
+        return std::make_tuple(colorbuf, depthbuf, imubuf);
     }
 };
 
