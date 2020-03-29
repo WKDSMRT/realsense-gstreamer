@@ -51,7 +51,6 @@ public:
         auto depth_sz = static_cast<size_t>(depth.get_data_size());
         rs2::motion_frame accel_frame = frame_set.first_or_default(RS2_STREAM_ACCEL);
         rs2::motion_frame gyro_frame = frame_set.first_or_default(RS2_STREAM_ACCEL);
-        auto accel = accel_frame.get_motion_data();
         auto imu_sz = accel_frame.get_data_size() + gyro_frame.get_data_size(); // s.b. 24 bytes
         constexpr auto header_sz = sizeof(RSHeader);
 

@@ -5,7 +5,7 @@ GST_PLUGIN_PATH=/usr/local/lib/gstreamer-1.0/
 export GST_PLUGIN_PATH
 
 # set debug level. range is 0 (none) to 9 (most)
-GST_DEBUG=2
+GST_DEBUG=0
 export GST_DEBUG
 
 # gst-launch-1.0 -v -m realsensesrc ! videoconvert ! autovideosink

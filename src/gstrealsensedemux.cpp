@@ -111,11 +111,12 @@ gst_rsdemux_class_init (GstRSDemuxClass * klass)
   gst_element_class_add_static_pad_template (gstelement_class, &sink_tmpl);
   gst_element_class_add_static_pad_template (gstelement_class, &color_src_tmpl);
   gst_element_class_add_static_pad_template (gstelement_class, &depth_src_tmpl);
+  gst_element_class_add_static_pad_template (gstelement_class, &imu_src_templ);
 
   gst_element_class_set_static_metadata (gstelement_class,
-      "RealSense Source Demuxer", "FIXME:Demuxer",
+      "RealSense Source Demuxer", "Realsense Demuxer",
       "Separate realsense stream into components: color, depth, IMU",
-      "Tim Connelly <user@hostname.org>");
+      "Tim Connelly <timpconnelly@gmail.com>");
 
   GST_DEBUG_CATEGORY_INIT (rsdemux_debug, "rsdemux", 0, "RS demuxer element");
 }
@@ -153,7 +154,7 @@ gst_rsdemux_reset (GstRSDemux * rsdemux)
 }
 
 static GstPad *
-gst_rsdemux_add_pad (GstRSDemux * rsdemux, GstStaticPadTemplate * templ, GstCaps * caps, gchar* stream_name)
+gst_rsdemux_add_pad (GstRSDemux * rsdemux, GstStaticPadTemplate * templ, GstCaps * caps, std::string&& stream_name)
 {
   GstPad *pad;
   GstEvent *event;
@@ -168,7 +169,7 @@ gst_rsdemux_add_pad (GstRSDemux * rsdemux, GstStaticPadTemplate * templ, GstCaps
   gst_pad_use_fixed_caps (pad);
   gst_pad_set_active (pad, TRUE);
 
-  stream_id = gst_pad_create_stream_id (pad, GST_ELEMENT_CAST (rsdemux), stream_name);
+  stream_id = gst_pad_create_stream_id (pad, GST_ELEMENT_CAST (rsdemux), stream_name.c_str());
   event = gst_event_new_stream_start (stream_id);
   
   gst_pad_push_event (pad, event);
