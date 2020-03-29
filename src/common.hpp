@@ -45,7 +45,10 @@ struct RSHeader {
       return true;
     if (depth_format != rhs.depth_format)
       return true;
-
+    if (accel_format != rhs.accel_format)
+      return true;
+    if (gyro_format != rhs.gyro_format)
+      return true;
     return false;
   }
 

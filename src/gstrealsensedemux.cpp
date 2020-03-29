@@ -187,11 +187,15 @@ gst_rsdemux_remove_pads (GstRSDemux * rsdemux)
 {
   if (rsdemux->colorsrcpad) {
     gst_element_remove_pad (GST_ELEMENT (rsdemux), rsdemux->colorsrcpad);
-    rsdemux->colorsrcpad = NULL;
+    rsdemux->colorsrcpad = nullptr;
   }
   if (rsdemux->depthsrcpad) {
     gst_element_remove_pad (GST_ELEMENT (rsdemux), rsdemux->depthsrcpad);
-    rsdemux->depthsrcpad = NULL;
+    rsdemux->depthsrcpad = nullptr;
+  }
+  if (rsdemux->imusrcpad) {
+    gst_element_remove_pad (GST_ELEMENT (rsdemux), rsdemux->imusrcpad);
+    rsdemux->imusrcpad = nullptr;
   }
 }
 
@@ -340,16 +344,13 @@ static GstFlowReturn make_new_pads(GstRSDemux* rsdemux, const RSHeader& header)
         "framerate", GST_TYPE_FRACTION, 30, 1,
         NULL);
 
-// #region IMU-as-audio
   GstAudioInfo info;
   constexpr gint imu_rate = GST_AUDIO_DEF_RATE;
   constexpr gint imu_channels = 6; // x,y,z for accel and gyro
   gst_audio_info_init(&info);
-  gst_audio_info_set_format(&info, GST_AUDIO_FORMAT_F32, imu_rate, imu_channels, NULL);
+  gst_audio_info_set_format(&info, static_cast<GstAudioFormat>(header.accel_format), imu_rate, imu_channels, NULL);
+
   const auto imu_caps = gst_audio_info_to_caps(&info);
-
-// #endregion
-
   GST_CAT_DEBUG(rsdemux_debug, "made pad caps");
 
   if (G_UNLIKELY (rsdemux->colorsrcpad == nullptr) || G_UNLIKELY(rsdemux->depthsrcpad==nullptr) || G_UNLIKELY(rsdemux->imusrcpad==nullptr)) 
@@ -407,9 +408,14 @@ gst_rsdemux_demux_video (GstRSDemux * rsdemux, GstBuffer * buffer)
   ret = gst_pad_push (rsdemux->depthsrcpad, depthbuf);
   if (ret != GST_FLOW_OK)
     GST_ELEMENT_WARNING(rsdemux, RESOURCE, SETTINGS, ("Pushing to depth src gave %d.", ret), (NULL));
-  ret = gst_pad_push (rsdemux->imusrcpad, imubuf);
-  if (ret != GST_FLOW_OK)
-    GST_ELEMENT_WARNING(rsdemux, RESOURCE, SETTINGS, ("Pushing to IMU src gave %d.", ret), (NULL));
+  
+  if(imubuf != nullptr && rsdemux->imusrcpad != nullptr)
+  {
+    ret = gst_pad_push (rsdemux->imusrcpad, imubuf);
+    if (ret != GST_FLOW_OK)
+      GST_ELEMENT_WARNING(rsdemux, RESOURCE, SETTINGS, ("Pushing to IMU src gave %d.", ret), (NULL));
+  }
+  
   return ret;
 }
 

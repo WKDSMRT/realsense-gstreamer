@@ -49,9 +49,16 @@ public:
         auto color_sz = static_cast<size_t>(cframe.get_height() * src->gst_stride);
         auto depth = frame_set.get_depth_frame();
         auto depth_sz = static_cast<size_t>(depth.get_data_size());
-        rs2::motion_frame accel_frame = frame_set.first_or_default(RS2_STREAM_ACCEL);
-        rs2::motion_frame gyro_frame = frame_set.first_or_default(RS2_STREAM_ACCEL);
-        auto imu_sz = accel_frame.get_data_size() + gyro_frame.get_data_size(); // s.b. 24 bytes
+        
+        int imu_sz = 0;
+        rs2::frame accel_frame;
+        rs2::frame gyro_frame;
+        if(src->imu_on)
+        {
+            accel_frame = frame_set.first_or_default(RS2_STREAM_ACCEL);
+            gyro_frame = frame_set.first_or_default(RS2_STREAM_ACCEL);
+            imu_sz = accel_frame.get_data_size() + gyro_frame.get_data_size(); // s.b. 24 bytes
+        }
         constexpr auto header_sz = sizeof(RSHeader);
 
         /* TODO: use allocator or use from pool if that's more efficient or safer*/
@@ -104,7 +111,7 @@ public:
             outdata += depth_sz;
         }
 
-        if (imu_sz != 0)
+        if (imu_sz != 0 && src->imu_on)
         {
             memcpy(outdata, accel_frame.get_data(), accel_frame.get_data_size());
             outdata += accel_frame.get_data_size();
@@ -133,20 +140,24 @@ public:
         auto ddata = cdata + color_sz;
         memcpy(dmap.data, ddata, depth_sz);
 
-        auto imubuf = gst_buffer_new_and_alloc(depth_sz);
-        gst_buffer_map(imubuf, &imumap, GST_MAP_READ);
-        constexpr auto imu_sz = 2*sizeof(rs2_vector);
-        auto imudata = ddata + depth_sz;
-        memcpy(imumap.data, imudata, imu_sz);
+        GstBuffer* imubuf = nullptr;
+        if (header.accel_format != GST_AUDIO_FORMAT_UNKNOWN && header.gyro_format != GST_AUDIO_FORMAT_UNKNOWN)
+        {
+            imubuf = gst_buffer_new_and_alloc(depth_sz);
+            gst_buffer_map(imubuf, &imumap, GST_MAP_READ);
+            constexpr auto imu_sz = 2*sizeof(rs2_vector);
+            auto imudata = ddata + depth_sz;
+            memcpy(imumap.data, imudata, imu_sz);
+            GST_BUFFER_TIMESTAMP(imubuf) = GST_BUFFER_TIMESTAMP(buffer);
+            gst_buffer_unmap(imubuf, &imumap);
+        }
 
         GST_BUFFER_TIMESTAMP(colorbuf) = GST_BUFFER_TIMESTAMP(buffer);
         GST_BUFFER_TIMESTAMP(depthbuf) = GST_BUFFER_TIMESTAMP(buffer);
-        GST_BUFFER_TIMESTAMP(imubuf) = GST_BUFFER_TIMESTAMP(buffer);
 
         gst_buffer_unmap(buffer, &inmap);
         gst_buffer_unmap(colorbuf, &cmap);
         gst_buffer_unmap(depthbuf, &dmap);
-        gst_buffer_unmap(imubuf, &imumap);
 
         return std::make_tuple(colorbuf, depthbuf, imubuf);
     }

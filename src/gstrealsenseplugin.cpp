@@ -25,6 +25,7 @@
 
 #include <gst/gst.h>
 #include <gst/video/video.h>
+#include <gst/audio/audio.h>
 
 #include "gstrealsenseplugin.h"
 #include "gstrealsensedemux.h"
@@ -42,7 +43,8 @@ enum
   PROP_0,
   PROP_CAM_SN,
   PROP_ALIGN,
-  PROP_DEPTH_ON
+  PROP_DEPTH_ON,
+  PROP_IMU_ON
 };
 
 /* the capabilities of the inputs and outputs.
@@ -132,9 +134,12 @@ gst_realsense_src_class_init (GstRealsenseSrcClass * klass)
         StreamType::StreamColor, StreamType::StreamMux, StreamType::StreamDepth,
         (GParamFlags)(G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS)));
 
-  g_object_class_install_property (
-    gobject_class, 
-    PROP_CAM_SN,
+  g_object_class_install_property (gobject_class, PROP_IMU_ON,
+    g_param_spec_boolean ("imu-on", "Enable IMU",
+        "Enable streaming of IMU data", false,
+        (GParamFlags)(G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS)));
+
+  g_object_class_install_property (gobject_class, PROP_CAM_SN,
     g_param_spec_uint64 ("cam-serial-number", "cam-sn",
           "Camera serial number (as unsigned int)", 
           0, G_MAXUINT64, 0,
@@ -175,6 +180,9 @@ gst_realsense_src_set_property (GObject * object, guint prop_id, const GValue * 
     case PROP_DEPTH_ON:
       src->stream_type = static_cast<StreamType>(g_value_get_int(value));
       break;
+    case PROP_IMU_ON:
+      src->imu_on = g_value_get_boolean(value);
+      break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
       break;
@@ -196,6 +204,9 @@ gst_realsense_src_get_property (GObject * object, guint prop_id, GValue * value,
     case PROP_DEPTH_ON:
       g_value_set_int(value, src->stream_type);
       break;
+    case PROP_IMU_ON:
+      g_value_set_boolean(value, src->imu_on);
+      break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
       break;
@@ -216,7 +227,9 @@ gst_realsense_src_create_buffer_from_frameset (GstRealsenseSrc * src, rs2::frame
     depth.get_height(),
     depth.get_width(),
     depth.get_stride_in_bytes(),
-    src->depth_format
+    src->depth_format,
+    src->accel_format,
+    src->gyro_format
   };
   
   GST_CAT_DEBUG(gst_realsense_src_debug, "muxing data into GstBuffer");
@@ -295,7 +308,7 @@ gst_realsense_src_create (GstPushSrc * psrc, GstBuffer ** buf)
   return GST_FLOW_OK;
 }
 
-static GstVideoFormat RS_to_Gst_Format(rs2_format fmt)
+static GstVideoFormat RS_to_Gst_Video_Format(rs2_format fmt)
 {
   switch(fmt){
         case RS2_FORMAT_RGB8:
@@ -322,6 +335,17 @@ static GstVideoFormat RS_to_Gst_Format(rs2_format fmt)
           return GST_VIDEO_FORMAT_YVYU;
         default:
           return GST_VIDEO_FORMAT_UNKNOWN;
+      }
+}
+
+static GstAudioFormat RS_to_Gst_Audio_Format(rs2_format fmt)
+{
+  switch(fmt){
+        case RS2_FORMAT_XYZ32F:
+        case RS2_FORMAT_MOTION_XYZ32F:
+          return GST_AUDIO_FORMAT_F32;
+        default:
+          return GST_AUDIO_FORMAT_UNKNOWN;
       }
 }
 
@@ -444,7 +468,7 @@ gst_realsense_src_start (GstBaseSrc * basesrc)
         auto cframe = frame_set.get_color_frame();
         height = cframe.get_height();
         width = cframe.get_width();
-        src->color_format = RS_to_Gst_Format(cframe.get_profile().format());
+        src->color_format = RS_to_Gst_Video_Format(cframe.get_profile().format());
         fmt = src->color_format;
       }
       else if(src->stream_type == StreamType::StreamDepth)
@@ -452,7 +476,7 @@ gst_realsense_src_start (GstBaseSrc * basesrc)
         auto depth = frame_set.get_depth_frame();
         height = depth.get_height();
         width = depth.get_width();
-        src->depth_format = RS_to_Gst_Format(depth.get_profile().format());
+        src->depth_format = RS_to_Gst_Video_Format(depth.get_profile().format());
         fmt = src->depth_format;
       }
       else if(src->stream_type == StreamType::StreamMux)
@@ -462,14 +486,17 @@ gst_realsense_src_start (GstBaseSrc * basesrc)
 
         height = cframe.get_height();
         width = cframe.get_width();
-        src->depth_format = RS_to_Gst_Format(depth.get_profile().format());
-        src->color_format = RS_to_Gst_Format(cframe.get_profile().format());
+        src->depth_format = RS_to_Gst_Video_Format(depth.get_profile().format());
+        src->color_format = RS_to_Gst_Video_Format(cframe.get_profile().format());
 
         auto depth_height = depth.get_height();
         height += (depth_height * depth.get_stride_in_bytes()) / cframe.get_stride_in_bytes();
         fmt = src->color_format;
-        if(src->has_imu)
+      
+        if(src->has_imu && src->imu_on)
         {
+          src->accel_format = RS_to_Gst_Audio_Format(frame_set.first_or_default(RS2_STREAM_ACCEL).get_profile().format());
+          src->gyro_format = RS_to_Gst_Audio_Format(frame_set.first_or_default(RS2_STREAM_GYRO).get_profile().format());
           constexpr auto imu_size = 2 * sizeof(rs2_vector);
           // add enough for imu data
           height += std::ceil(imu_size / cframe.get_stride_in_bytes()); 

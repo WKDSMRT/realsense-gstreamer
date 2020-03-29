@@ -4,7 +4,7 @@ GStreamer source plugin for the Intel RealSense line of cameras.
 
 The plugin is actually two elements, a pure source and a demuxer. The source is set up as a GstPushSrc, based on [gst-vision-plugins](https://github.com/joshdoe/gst-plugins-vision) and GstVideoTestSrc. The demuxer is based on GstDVDemux from the gst-plugins-good package. 
 
-The source element combines color and depth channels into a single buffer passed to its source pad. The demuxer receives that buffer on its sink pad and splits it into color and depth buffers and passes the buffers into the respective source pads. 
+The source element combines color and depth channels  and IMU into a single buffer passed to out thru its source pad. The demuxer receives that buffer on its sink pad and splits it into color, depth and IMU buffers and and passes the buffers into the respective source pads. The IMU pad is configured as an audio pad with 6 channels of 32-bit floating point data.
 
 The primary reason for this configuration is that GstBaseSrc, which GstPushSrc inherits, allows for only a single source pad. The use of the demuxer is not required. A downstream element may demux the itself buffer. This may be useful for processing that requires synchronized color and depth information.
 
@@ -25,8 +25,6 @@ D435i is currently supported.
 - Test alignment property
     - Mostly works. See known issue below.
 - Add IMU data
-    - property to turn on/off
-    - how to pass on from demux? Use an audio src pad?
 - src/gstrealsenseplugin.cpp:257:  /* TODO: use allocator or use from pool if that's more efficient or safer*/
 - src/gstrealsenseplugin.cpp:284:      /* TODO: use orc_memcpy */
 - src/gstrealsenseplugin.cpp:314:      /* TODO: use orc_memcpy */
