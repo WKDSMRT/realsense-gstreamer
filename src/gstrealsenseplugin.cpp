@@ -5,7 +5,7 @@
 /**
  * SECTION:element-realsensesrc
  *
- * FIXME: Source element for Intel RealSense camera. This source takes the 
+ * Source element for Intel RealSense camera. This source takes the 
  * frame_set from the RealSense SDK and multiplexes it into a single buffer
  * that is pushed out on the source pad. Downstream elements may receive this buffer
  * and demux it themselves (use RSMux::demux) or use the rsdemux element to split
@@ -99,9 +99,9 @@ gst_realsense_src_class_init (GstRealsenseSrcClass * klass)
 
   gst_element_class_set_details_simple(gstelement_class,
     "RealsenseSrc",
-    "FIXME:Generic",
-    "FIXME:Generic Template Element",
-    "tim <<user@hostname.org>>");
+    "Source/Video/Sensors",
+    "Source element for Intel RealSense multiplexed video, depth and IMU data",
+    "Tim Connelly <<timpconnelly@gmail.com>>");
 
   // gst_element_class_add_pad_template (gstelement_class,
   //     gst_static_pad_template_get (&src_factory));

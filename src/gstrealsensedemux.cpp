@@ -14,8 +14,6 @@
  * This pipeline captures realsense stream, demuxes it to color and depth
  * and renders them to videosinks.
  *
- * TODO
- * - Clean up log/debug/info messages
  */
 
 #ifdef HAVE_CONFIG_H
@@ -377,7 +375,6 @@ static GstFlowReturn make_new_pads(GstRSDemux* rsdemux, const RSHeader& header)
   return GST_FLOW_OK;
 }
 
-/* takes ownership of buffer FIXME */
 static GstFlowReturn
 gst_rsdemux_demux_video (GstRSDemux * rsdemux, GstBuffer * buffer)
 {
@@ -415,7 +412,7 @@ gst_rsdemux_demux_video (GstRSDemux * rsdemux, GstBuffer * buffer)
     if (ret != GST_FLOW_OK)
       GST_ELEMENT_WARNING(rsdemux, RESOURCE, SETTINGS, ("Pushing to IMU src gave %d.", ret), (NULL));
   }
-  
+
   return ret;
 }
 

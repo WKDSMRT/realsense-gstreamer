@@ -18,23 +18,22 @@ D435i is currently supported.
 ### Source
 - control debug output and messages
 - Test application
-- Performance metrics 
-    - frame rate in particular
 - Add metadata
     - What metadata is needed?
-- Test alignment property
-    - Mostly works. See known issue below.
 - Add IMU data
-- src/gstrealsenseplugin.cpp:257:  /* TODO: use allocator or use from pool if that's more efficient or safer*/
-- src/gstrealsenseplugin.cpp:284:      /* TODO: use orc_memcpy */
-- src/gstrealsenseplugin.cpp:314:      /* TODO: use orc_memcpy */
-- src/gstrealsensedemux.cpp:219:  // TODO Handle any necessary src queries
-- src/gstrealsensedemux.cpp:235:  // TODO Handle any sink queries
-- src/gstrealsensedemux.cpp:333:    // TODO handle src pad events here
-- src/gstrealsensedemux.cpp:508:  // TODO What do we need to do in _flush?
-- src/gstrealsenseplugin.cpp:264:    src->info.finfo->format, // FIXME won't be correct if we only have depth
-- src/gstrealsenseplugin.cpp:268:    GST_VIDEO_FORMAT_GRAY16_LE //FIXME could be _LE or _BE
-- src/gstrealsenseplugin.cpp:530:          // FIXME Not exact format match
+- src/rsmux.hpp:64:        /* TODO: use allocator or use from pool if that's more efficient or safer*/
+- src/rsmux.hpp:82:        // TODO refactor this section into cleaner code
+- src/rsmux.hpp:89:        /* TODO: use orc_memcpy */
+- src/gstrealsenseplugin.cpp:2: * TODO add license
+- src/gstrealsensedemux.cpp:205:  // TODO Handle any necessary src queries
+- src/gstrealsensedemux.cpp:221:  // TODO Handle any sink queries
+- src/gstrealsensedemux.cpp:317:    // TODO handle src pad events here
+- src/gstrealsensedemux.cpp:454:  // TODO What do we need to do in _flush?
+- src/gstrealsenseplugin.cpp:8: * FIXME: Source element for Intel RealSense camera. This source takes the 
+- src/gstrealsenseplugin.cpp:102:    "FIXME:Generic",
+- src/gstrealsenseplugin.cpp:103:    "FIXME:Generic Template Element",
+- src/gstrealsenseplugin.cpp:334:          // FIXME Not exact format match
+- src/gstrealsensedemux.cpp:378:/* takes ownership of buffer FIXME */
 - set plugin defines specific to WKD.SMRT/RealSense
 - Maybe add capability to generate synthetic data if no camera is connected.
     - Should be develop mode only
