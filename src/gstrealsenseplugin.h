@@ -12,7 +12,6 @@
 
 #include <librealsense2/rs.hpp>
 
-// #include "rsmux.hpp"
 #include "common.hpp"
 
 G_BEGIN_DECLS
@@ -47,15 +46,23 @@ struct _GstRealsenseSrc
   GstCaps *caps;
   gint height;
   gint gst_stride;
-  
+  GstVideoFormat color_format = GST_VIDEO_FORMAT_UNKNOWN;
+  GstVideoFormat depth_format = GST_VIDEO_FORMAT_UNKNOWN;
+  GstAudioFormat accel_format = GST_AUDIO_FORMAT_UNKNOWN;
+  GstAudioFormat gyro_format = GST_AUDIO_FORMAT_UNKNOWN;
+  GstClockTime prev_time = 0;
+  guint64 frame_count = 0;
+
   // Realsense vars
   rs_pipe_ptr rs_pipeline = nullptr;
   rs_aligner_ptr aligner = nullptr;
-
+  bool has_imu = false;
+  
   // Properties
   Align align = Align::None;
   guint64 serial_number = 0;
   StreamType stream_type = StreamType::StreamDepth;
+  bool imu_on = true;
 };
 
 struct _GstRealsenseSrcClass 

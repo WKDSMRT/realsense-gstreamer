@@ -5,7 +5,7 @@
 #define __GST_RSDEMUX_H__
 
 #include <gst/gst.h>
-// #include "rsmux.hpp"
+#include "common.hpp"
 
 G_BEGIN_DECLS
 
@@ -30,22 +30,14 @@ struct _GstRSDemux {
   GstPad        *sinkpad;
   GstPad        *colorsrcpad = nullptr;
   GstPad        *depthsrcpad = nullptr;
-
-// TODO put encode/decode all in a single file/class
-// dv_decoder_t  *decoder;
-
+  GstPad        *imusrcpad = nullptr;
+  
   /* video params */
+  RSHeader header;
   gint           in_height;
   gint           in_width;
   gint           in_stride_bytes;
 
-  gint           color_height;
-  gint           color_width;
-  gint           color_stride_bytes;
-
-  gint           depth_height;
-  gint           depth_width;
-  gint           depth_stride_bytes;
   gint           frame_count = 0;
 };
 

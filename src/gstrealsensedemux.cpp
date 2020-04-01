@@ -21,6 +21,7 @@
 #endif
 
 #include <gst/video/video.h>
+#include <gst/audio/audio.h>
 
 #include "gstrealsensedemux.h"
 #include "gstrealsenseplugin.h"
@@ -61,36 +62,35 @@ static GstStaticPadTemplate depth_src_tmpl = GST_STATIC_PAD_TEMPLATE ("depth",
         ("{ GRAY16_LE, GRAY16_BE }"))
     );
 
+static GstStaticPadTemplate imu_src_templ = GST_STATIC_PAD_TEMPLATE ("imu",
+    GST_PAD_SRC,
+    GST_PAD_SOMETIMES,
+    GST_STATIC_CAPS ("audio/x-raw, "
+        "format = (string) " GST_AUDIO_NE (F32) ", "
+        "layout = (string) interleaved, "
+        "rate = (int) { 32000, 44100, 48000 }, " "channels = (int) {3, 6}")
+    );
+
 #define gst_rsdemux_parent_class parent_class
 G_DEFINE_TYPE (GstRSDemux, gst_rsdemux, GST_TYPE_ELEMENT);
 
 static void gst_rsdemux_finalize (GObject * object);
 
 /* query functions */
-static gboolean gst_rsdemux_src_query (GstPad * pad, GstObject * parent,
-    GstQuery * query);
-static gboolean gst_rsdemux_sink_query (GstPad * pad, GstObject * parent,
-    GstQuery * query);
+static gboolean gst_rsdemux_src_query (GstPad * pad, GstObject * parent, GstQuery * query);
+static gboolean gst_rsdemux_sink_query (GstPad * pad, GstObject * parent, GstQuery * query);
 
 /* event functions */
 static gboolean gst_rsdemux_send_event (GstElement * element, GstEvent * event);
-static gboolean gst_rsdemux_handle_src_event (GstPad * pad, GstObject * parent,
-    GstEvent * event);
-static gboolean gst_rsdemux_handle_sink_event (GstPad * pad, GstObject * parent,
-    GstEvent * event);
+static gboolean gst_rsdemux_handle_src_event (GstPad * pad, GstObject * parent, GstEvent * event);
+static gboolean gst_rsdemux_handle_sink_event (GstPad * pad, GstObject * parent, GstEvent * event);
 
 /* scheduling functions */
 static GstFlowReturn gst_rsdemux_flush (GstRSDemux * rsdemux);
-static GstFlowReturn gst_rsdemux_chain (GstPad * pad, GstObject * parent,
-    GstBuffer * buffer);
+static GstFlowReturn gst_rsdemux_chain (GstPad * pad, GstObject * parent, GstBuffer * buffer);
 
 /* state change functions */
-static gboolean gst_rsdemux_sink_activate (GstPad * sinkpad,
-    GstObject * parent);
-static gboolean gst_rsdemux_sink_activate_mode (GstPad * sinkpad,
-    GstObject * parent, GstPadMode mode, gboolean active);
-static GstStateChangeReturn gst_rsdemux_change_state (GstElement * element,
-    GstStateChange transition);
+static GstStateChangeReturn gst_rsdemux_change_state (GstElement * element, GstStateChange transition);
 
 static void
 gst_rsdemux_class_init (GstRSDemuxClass * klass)
@@ -109,11 +109,12 @@ gst_rsdemux_class_init (GstRSDemuxClass * klass)
   gst_element_class_add_static_pad_template (gstelement_class, &sink_tmpl);
   gst_element_class_add_static_pad_template (gstelement_class, &color_src_tmpl);
   gst_element_class_add_static_pad_template (gstelement_class, &depth_src_tmpl);
+  gst_element_class_add_static_pad_template (gstelement_class, &imu_src_templ);
 
   gst_element_class_set_static_metadata (gstelement_class,
-      "RealSense Source Demuxer", "FIXME:Demuxer",
+      "RealSense Source Demuxer", "Realsense Demuxer",
       "Separate realsense stream into components: color, depth, IMU",
-      "Tim Connelly <user@hostname.org>");
+      "Tim Connelly <timpconnelly@gmail.com>");
 
   GST_DEBUG_CATEGORY_INIT (rsdemux_debug, "rsdemux", 0, "RS demuxer element");
 }
@@ -122,11 +123,6 @@ static void
 gst_rsdemux_init (GstRSDemux * rsdemux)
 {
   rsdemux->sinkpad = gst_pad_new_from_static_template (&sink_tmpl, "sink");
-  /* we can operate in pull and push mode so we install
-   * a custom activate function */
-  gst_pad_set_activate_function (rsdemux->sinkpad, GST_DEBUG_FUNCPTR (gst_rsdemux_sink_activate));
-  /* the function to activate in push mode */
-  gst_pad_set_activatemode_function (rsdemux->sinkpad, GST_DEBUG_FUNCPTR (gst_rsdemux_sink_activate_mode));
   /* for push mode, this is the chain function */
   gst_pad_set_chain_function (rsdemux->sinkpad, GST_DEBUG_FUNCPTR (gst_rsdemux_chain));
   /* handling events (in push mode only) */
@@ -152,16 +148,11 @@ gst_rsdemux_reset (GstRSDemux * rsdemux)
   rsdemux->in_height = 0;
   rsdemux->in_width = 0;
   rsdemux->in_stride_bytes = 0;
-  rsdemux->color_height = 0;
-  rsdemux->color_width = 0;
-  rsdemux->color_stride_bytes = 0;
-  rsdemux->depth_height = 0;
-  rsdemux->depth_width = 0;
-  rsdemux->depth_stride_bytes = 0;
+  rsdemux->header = {};
 }
 
 static GstPad *
-gst_rsdemux_add_pad (GstRSDemux * rsdemux, GstStaticPadTemplate * templ, GstCaps * caps)
+gst_rsdemux_add_pad (GstRSDemux * rsdemux, GstStaticPadTemplate * templ, GstCaps * caps, std::string&& stream_name)
 {
   GstPad *pad;
   GstEvent *event;
@@ -176,9 +167,7 @@ gst_rsdemux_add_pad (GstRSDemux * rsdemux, GstStaticPadTemplate * templ, GstCaps
   gst_pad_use_fixed_caps (pad);
   gst_pad_set_active (pad, TRUE);
 
-  stream_id = gst_pad_create_stream_id (pad,
-                GST_ELEMENT_CAST (rsdemux),
-                templ == &color_src_tmpl ? "color" : "depth");
+  stream_id = gst_pad_create_stream_id (pad, GST_ELEMENT_CAST (rsdemux), stream_name.c_str());
   event = gst_event_new_stream_start (stream_id);
   
   gst_pad_push_event (pad, event);
@@ -196,11 +185,15 @@ gst_rsdemux_remove_pads (GstRSDemux * rsdemux)
 {
   if (rsdemux->colorsrcpad) {
     gst_element_remove_pad (GST_ELEMENT (rsdemux), rsdemux->colorsrcpad);
-    rsdemux->colorsrcpad = NULL;
+    rsdemux->colorsrcpad = nullptr;
   }
   if (rsdemux->depthsrcpad) {
     gst_element_remove_pad (GST_ELEMENT (rsdemux), rsdemux->depthsrcpad);
-    rsdemux->depthsrcpad = NULL;
+    rsdemux->depthsrcpad = nullptr;
+  }
+  if (rsdemux->imusrcpad) {
+    gst_element_remove_pad (GST_ELEMENT (rsdemux), rsdemux->imusrcpad);
+    rsdemux->imusrcpad = nullptr;
   }
 }
 
@@ -276,8 +269,6 @@ gst_rsdemux_handle_sink_event (GstPad * pad, GstObject * parent,
       res = gst_rsdemux_push_event (rsdemux, event);
       break;
     case GST_EVENT_FLUSH_STOP:
-      //  TODO gst_adapter_clear (rsdemux->adapter);
-      // GST_DEBUG ("cleared adapter");
       res = gst_rsdemux_push_event (rsdemux, event);
       break;
     case GST_EVENT_EOS:
@@ -330,9 +321,60 @@ gst_rsdemux_handle_src_event (GstPad * pad, GstObject * parent,
   }
 
   return res;
-  }
+}
 
-/* takes ownership of buffer FIXME */
+static GstFlowReturn make_new_pads(GstRSDemux* rsdemux, const RSHeader& header)
+{
+  rsdemux->header = header;
+
+  GST_CAT_DEBUG(rsdemux_debug, "making pad caps");
+
+  auto color_caps = gst_caps_new_simple ("video/x-raw",
+        "format", G_TYPE_STRING, "RGB",
+        "width", G_TYPE_INT, header.color_width,
+        "height", G_TYPE_INT, header.color_height,
+        "framerate", GST_TYPE_FRACTION, 30, 1,
+        NULL);
+  auto depth_caps = gst_caps_new_simple ("video/x-raw",
+        "format", G_TYPE_STRING, "GRAY16_LE",
+        "width", G_TYPE_INT, header.depth_width,
+        "height", G_TYPE_INT, header.depth_height,
+        "framerate", GST_TYPE_FRACTION, 30, 1,
+        NULL);
+
+  GstAudioInfo info;
+  constexpr gint imu_rate = GST_AUDIO_DEF_RATE;
+  constexpr gint imu_channels = 6; // x,y,z for accel and gyro
+  gst_audio_info_init(&info);
+  gst_audio_info_set_format(&info, static_cast<GstAudioFormat>(header.accel_format), imu_rate, imu_channels, NULL);
+
+  const auto imu_caps = gst_audio_info_to_caps(&info);
+  GST_CAT_DEBUG(rsdemux_debug, "made pad caps");
+
+  if (G_UNLIKELY (rsdemux->colorsrcpad == nullptr) || G_UNLIKELY(rsdemux->depthsrcpad==nullptr) || G_UNLIKELY(rsdemux->imusrcpad==nullptr)) 
+  {
+    GST_CAT_DEBUG(rsdemux_debug, "adding pads");
+
+    rsdemux->colorsrcpad = gst_rsdemux_add_pad (rsdemux, &color_src_tmpl, color_caps, "color");
+    rsdemux->depthsrcpad = gst_rsdemux_add_pad (rsdemux, &depth_src_tmpl, depth_caps, "depth");
+    rsdemux->imusrcpad = gst_rsdemux_add_pad(rsdemux, &imu_src_templ, imu_caps, "imu");
+
+    if (rsdemux->colorsrcpad && rsdemux->depthsrcpad && rsdemux->imusrcpad)
+      gst_element_no_more_pads (GST_ELEMENT (rsdemux));
+  }
+  else
+  {
+    gst_pad_set_caps (rsdemux->colorsrcpad, color_caps);
+    gst_pad_set_caps (rsdemux->depthsrcpad, depth_caps);
+    gst_pad_set_caps (rsdemux->imusrcpad, imu_caps);
+  }
+  gst_caps_unref (color_caps);
+  gst_caps_unref (depth_caps);
+  gst_caps_unref (imu_caps);
+
+  return GST_FLOW_OK;
+}
+
 static GstFlowReturn
 gst_rsdemux_demux_video (GstRSDemux * rsdemux, GstBuffer * buffer)
 {
@@ -342,59 +384,34 @@ gst_rsdemux_demux_video (GstRSDemux * rsdemux, GstBuffer * buffer)
   const auto header = RSMux::GetRSHeader(rsdemux, buffer);
 
   // see if anything changed 
-  if (G_UNLIKELY (rsdemux->colorsrcpad == nullptr) || (rsdemux->in_stride_bytes != header.color_stride)) //|| (rsdemux->in_height != header.color_height))
+  if (rsdemux->header != header || 
+    G_UNLIKELY (rsdemux->colorsrcpad == nullptr) || 
+    G_UNLIKELY (rsdemux->depthsrcpad == nullptr))
   {
-    rsdemux->in_stride_bytes = header.color_stride;
-
-    gst_element_post_message(GST_ELEMENT_CAST(rsdemux), 
-      gst_message_new_info(GST_OBJECT_CAST(rsdemux), NULL, "making pad caps"));
-
-    auto color_caps = gst_caps_new_simple ("video/x-raw",
-          "format", G_TYPE_STRING, "RGB",
-          "width", G_TYPE_INT, header.color_width,
-          "height", G_TYPE_INT, header.color_height,
-          "framerate", GST_TYPE_FRACTION, 30, 1,
-          NULL);
-    auto depth_caps = gst_caps_new_simple ("video/x-raw",
-          "format", G_TYPE_STRING, "GRAY16_LE",
-          "width", G_TYPE_INT, header.depth_width,
-          "height", G_TYPE_INT, header.depth_height,
-          "framerate", GST_TYPE_FRACTION, 30, 1,
-          NULL);
-
-    gst_element_post_message(GST_ELEMENT_CAST(rsdemux), 
-      gst_message_new_info(GST_OBJECT_CAST(rsdemux), NULL, "made pad caps"));
-    if (G_UNLIKELY (rsdemux->colorsrcpad == nullptr) || G_UNLIKELY(rsdemux->depthsrcpad==nullptr)) 
-    {
-      gst_element_post_message(GST_ELEMENT_CAST(rsdemux), 
-        gst_message_new_info(GST_OBJECT_CAST(rsdemux), NULL, "adding pads"));
-
-      rsdemux->colorsrcpad = gst_rsdemux_add_pad (rsdemux, &color_src_tmpl, color_caps);
-      rsdemux->depthsrcpad = gst_rsdemux_add_pad (rsdemux, &depth_src_tmpl, depth_caps);
-
-      if (rsdemux->colorsrcpad && rsdemux->depthsrcpad)
-        gst_element_no_more_pads (GST_ELEMENT (rsdemux));
-
-    }
-    else
-    {
-      gst_pad_set_caps (rsdemux->colorsrcpad, color_caps);
-      gst_pad_set_caps (rsdemux->depthsrcpad, depth_caps);
-    }
-    gst_caps_unref (color_caps);
-    gst_caps_unref (depth_caps);
+    gst_rsdemux_remove_pads(rsdemux);
+    make_new_pads(rsdemux, header);
   }
   
   /* takes ownership of buffer here, we just need to modify
    * the metadata. */
   // outbuf = gst_buffer_make_writable (buffer);
-  auto [colorbuf, depthbuf] = RSMux::demux(buffer, header);
+  auto [colorbuf, depthbuf, imubuf] = RSMux::demux(buffer, header);
 
-  gst_element_post_message(GST_ELEMENT_CAST(rsdemux), 
-    gst_message_new_info(GST_OBJECT_CAST(rsdemux), NULL, "pushing buffers"));
-        
+  GST_CAT_DEBUG(rsdemux_debug, "pushing buffers");
+
   ret = gst_pad_push (rsdemux->colorsrcpad, colorbuf);
+  if (ret != GST_FLOW_OK)
+    GST_ELEMENT_WARNING(rsdemux, RESOURCE, SETTINGS, ("Pushing to color src gave %d.", ret), (NULL));
   ret = gst_pad_push (rsdemux->depthsrcpad, depthbuf);
+  if (ret != GST_FLOW_OK)
+    GST_ELEMENT_WARNING(rsdemux, RESOURCE, SETTINGS, ("Pushing to depth src gave %d.", ret), (NULL));
+  
+  if(imubuf != nullptr && rsdemux->imusrcpad != nullptr)
+  {
+    ret = gst_pad_push (rsdemux->imusrcpad, imubuf);
+    if (ret != GST_FLOW_OK)
+      GST_ELEMENT_WARNING(rsdemux, RESOURCE, SETTINGS, ("Pushing to IMU src gave %d.", ret), (NULL));
+  }
 
   return ret;
 }
@@ -407,9 +424,7 @@ gst_rsdemux_demux_frame (GstRSDemux * rsdemux, GstBuffer * buffer)
   
   rsdemux->frame_count++;
   
-  gst_element_post_message(GST_ELEMENT_CAST(rsdemux), 
-            gst_message_new_info(GST_OBJECT_CAST(rsdemux), NULL, "demuxing frame"));
-  // GST_DEBUG_OBJECT (rsdemux, "%s", __FUNCTION__);
+  GST_CAT_DEBUG(rsdemux_debug, "demuxing frame");
 
   /* takes ownership of buffer */
   try 
@@ -432,7 +447,6 @@ gst_rsdemux_demux_frame (GstRSDemux * rsdemux, GstBuffer * buffer)
   return ret;
 }
 
-/* flush any remaining data in the adapter, used in chain based scheduling mode */
 static GstFlowReturn
 gst_rsdemux_flush (GstRSDemux * rsdemux)
 {
@@ -451,63 +465,6 @@ gst_rsdemux_chain (GstPad * pad, GstObject * parent, GstBuffer * buffer)
   return ret;
 }
 
-// FIXME looks like we don't need this
-static gboolean
-gst_rsdemux_sink_activate_mode (GstPad * sinkpad, GstObject * parent,
-    GstPadMode mode, gboolean active)
-{
-  gboolean res;
-  GstRSDemux *demux = GST_RSDEMUX (parent);
-
-  switch (mode) {
-    case GST_PAD_MODE_PUSH:
-      if (active) {
-        GST_DEBUG_OBJECT (demux, "activating push/chain function");
-        // demux->seek_handler = gst_rsdemux_handle_push_seek;
-      } else {
-        GST_DEBUG_OBJECT (demux, "deactivating push/chain function");
-        // demux->seek_handler = NULL;
-      }
-      res = TRUE;
-      break;
-    default:
-      res = FALSE;
-      break;
-  }
-  return res;
-}
-
-/* FIXME decide on push or pull based scheduling */
-static gboolean
-gst_rsdemux_sink_activate (GstPad * sinkpad, GstObject * parent)
-{
-  GstQuery *query;
-  gboolean pull_mode;
-
-  query = gst_query_new_scheduling ();
-
-  if (!gst_pad_peer_query (sinkpad, query)) {
-    gst_query_unref (query);
-    goto activate_push;
-  }
-
-  pull_mode = gst_query_has_scheduling_mode_with_flags (query,
-      GST_PAD_MODE_PULL, GST_SCHEDULING_FLAG_SEEKABLE);
-  gst_query_unref (query);
-
-  if (!pull_mode)
-    goto activate_push;
-
-  GST_DEBUG_OBJECT (sinkpad, "activating pull");
-  return gst_pad_activate_mode (sinkpad, GST_PAD_MODE_PULL, TRUE);
-
-activate_push:
-  {
-    GST_DEBUG_OBJECT (sinkpad, "activating push");
-    return gst_pad_activate_mode (sinkpad, GST_PAD_MODE_PUSH, TRUE);
-  }
-}
-
 static GstStateChangeReturn
 gst_rsdemux_change_state (GstElement * element, GstStateChange transition)
 {
@@ -518,8 +475,6 @@ gst_rsdemux_change_state (GstElement * element, GstStateChange transition)
     case GST_STATE_CHANGE_NULL_TO_READY:
       break;
     case GST_STATE_CHANGE_READY_TO_PAUSED:
-    //   rsdemux->decoder = dv_decoder_new (0, FALSE, FALSE);
-    //   dv_set_error_log (rsdemux->decoder, NULL);
       gst_rsdemux_reset (rsdemux);
       break;
     case GST_STATE_CHANGE_PAUSED_TO_PLAYING:
@@ -533,31 +488,11 @@ gst_rsdemux_change_state (GstElement * element, GstStateChange transition)
   switch (transition) {
     case GST_STATE_CHANGE_PLAYING_TO_PAUSED:
       break;
-    /*case GST_STATE_CHANGE_PAUSED_TO_READY:
-      gst_adapter_clear (rsdemux->adapter);
-      dv_decoder_free (rsdemux->decoder);
-      rsdemux->decoder = NULL;
-    */
+    case GST_STATE_CHANGE_PAUSED_TO_READY:
       gst_rsdemux_remove_pads (rsdemux);
-
-    /*  if (rsdemux->tag_event) {
-        gst_event_unref (rsdemux->tag_event);
-        rsdemux->tag_event = NULL;
-      }
-
       break;
-    */
     case GST_STATE_CHANGE_READY_TO_NULL:
-    {
-      // GstEvent **event_p;
-
-      // event_p = &rsdemux->seek_event;
-      // gst_event_replace (event_p, NULL);
-      // if (rsdemux->pending_segment)
-      //   gst_event_unref (rsdemux->pending_segment);
-      // rsdemux->pending_segment = NULL;
       break;
-    }
     default:
       break;
   }
