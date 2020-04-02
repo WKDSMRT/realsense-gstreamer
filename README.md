@@ -17,6 +17,7 @@ D435i is currently supported.
 ## To Do
 ### Source
 - control debug output and messages
+- Create bin element
 - Test application
 - Add metadata
     - What metadata is needed?

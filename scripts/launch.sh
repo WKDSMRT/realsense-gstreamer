@@ -5,18 +5,18 @@ GST_PLUGIN_PATH=/usr/local/lib/gstreamer-1.0/
 export GST_PLUGIN_PATH
 
 # set debug level. range is 0 (none) to 9 (most)
-GST_DEBUG=0
+GST_DEBUG=2
 export GST_DEBUG
 
 # gst-launch-1.0 -v -m realsensesrc ! videoconvert ! autovideosink
 # gst-launch-1.0 -vvv realsensesrc cam-serial-number=918512070217 ! videoconvert ! autovideosink 
 # gst-launch-1.0 -v -m realsensesrc stream-type=2 align=0 ! videoconvert ! autovideosink
 
+gst-launch-1.0 -vvv -m realsensesrc stream-type=2 align=0 imu_on=True ! rsdemux name=demux \
+   ! queue ! videoconvert ! autovideosink \
+   demux. ! queue ! videoconvert ! autovideosink \
+   demux. ! queue ! fakesink
+
 # gst-launch-1.0 -vvv -m realsensesrc stream-type=2 align=0 imu_on=false ! rsdemux name=demux \
 #    ! queue ! videoconvert ! autovideosink \
-#    demux. ! queue ! videoconvert ! autovideosink \
-#    demux. ! queue ! fakesink
-
-gst-launch-1.0 -vvv -m realsensesrc stream-type=2 align=0 imu_on=false ! rsdemux name=demux \
-   ! queue ! videoconvert ! autovideosink \
-   demux. ! queue ! videoconvert ! autovideosink
+#    demux. ! queue ! videoconvert ! autovideosink
