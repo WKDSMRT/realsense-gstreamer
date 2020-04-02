@@ -12,7 +12,7 @@ gi.require_version('Gst', '1.0')
 gi.require_version('Gtk', '3.0')
 from gi.repository import GObject, Gst, Gtk
 
-imu_on = False
+imu_on = True
 
 class GTK_Main(object):
 
@@ -37,42 +37,56 @@ class GTK_Main(object):
         self.pipeline = Gst.Pipeline.new('realsense-stream')
 
         rssrc = Gst.ElementFactory.make('realsensesrc')
+        rssrc.set_property('stream-type', 2)
+        rssrc.set_property('align', 0)
         rssrc.set_property('imu_on', imu_on)
+        
         rsdemux = Gst.ElementFactory.make('rsdemux', 'demux')
         rsdemux.connect('pad-added', self.demuxer_callback)
-        self.queue_color = Gst.ElementFactory.make('queue', 'queue-color')
         vidconvert_color = Gst.ElementFactory.make('videoconvert', 'convert-color')
         vidsink_color = Gst.ElementFactory.make('autovideosink', 'sink-color')
-        self.queue_depth = Gst.ElementFactory.make('queue', 'queue-depth')
         vidconvert_depth = Gst.ElementFactory.make('videoconvert', 'convert-depth')
         vidsink_depth = Gst.ElementFactory.make('autovideosink', 'sink-depth')
+        self.queue_color = Gst.ElementFactory.make('queue', 'queue_color')
+        self.queue_depth = Gst.ElementFactory.make('queue', 'queue_depth')
         if imu_on:
             self.queue_imu = Gst.ElementFactory.make('queue', 'queue-imu')
             sink_imu = Gst.ElementFactory.make('fakesink', 'sink-imu')
-        
 
         self.pipeline.add(rssrc)
         self.pipeline.add(rsdemux)
-        self.pipeline.add(self.queue_color)
         self.pipeline.add(vidconvert_color)
-        self.pipeline.add(vidsink_color)
-        self.pipeline.add(self.queue_depth)
         self.pipeline.add(vidconvert_depth)
+        self.pipeline.add(vidsink_color)
         self.pipeline.add(vidsink_depth)
+        self.pipeline.add(self.queue_color)
+        self.pipeline.add(self.queue_depth)
         if imu_on:
             self.pipeline.add(self.queue_imu)
             self.pipeline.add(sink_imu)
 
-        rssrc.link(rsdemux)
+        ret = rssrc.link(rsdemux)
+        if not ret:
+            print('failed to link source to demux')
+        
+        ret = self.queue_color.link(vidconvert_color)
+        if not ret:
+            print('failed to link queue_color to vidconvert')
 
-        self.queue_color.link(vidconvert_color)
-        vidconvert_color.link(vidsink_color)
-
-        self.queue_depth.link(vidconvert_depth)
-        vidconvert_depth.link(vidsink_depth)
-
+        ret = vidconvert_color.link(vidsink_color)
+        if not ret:
+            print('failed to link vidconvert to vidsink')
+        
         if imu_on:
             self.queue_imu.link(sink_imu)
+
+        ret = self.queue_depth.link(vidconvert_depth)
+        if not ret:
+            print('failed to link queue_depth to vidconvert')
+
+        ret = vidconvert_depth.link(vidsink_depth)
+        if not ret:
+            print('failed to link depth vidconvert to vidsink')
 
         bus = self.pipeline.get_bus()
         bus.add_signal_watch()
@@ -81,15 +95,22 @@ class GTK_Main(object):
         bus.connect("sync-message::element", self.on_sync_message)
 
     def demuxer_callback(self, demuxer, pad):
+        print(f'pad template: {pad.get_property("template").name_template}')
         if pad.get_property("template").name_template == "color":
-            qc_pad = self.queue_color.get_pad("sink")
-            pad.link(qc_pad)
+            qc_pad = self.queue_color.get_static_pad("sink")
+            linked = pad.link(qc_pad)
+            if linked != Gst.PadLinkReturn.OK:
+                print('failed to link demux to color queue')
         elif pad.get_property("template").name_template == "depth":
-            qd_pad = self.queue_depth.get_pad("sink")
-            pad.link(qd_pad)
-        elif pad.get_property("template").name_template == "imu":
-            qi_pad = self.queue_imu.get_pad("sink")
-            pad.link(qi_pad)
+            qd_pad = self.queue_depth.get_static_pad("sink")
+            linked = pad.link(qd_pad)
+            if linked != Gst.PadLinkReturn.OK:
+                print('failed to link demux to depth queue')
+        elif imu_on and pad.get_property("template").name_template == "imu":
+            qi_pad = self.queue_imu.get_static_pad("sink")
+            linked = pad.link(qi_pad)
+            if linked != Gst.PadLinkReturn.OK:
+                print('failed to link demux to IMU queue')
 
     def start_stop(self, w):
         if self.button.get_label() == "Start":
