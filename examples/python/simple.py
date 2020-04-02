@@ -12,7 +12,9 @@ gi.require_version('Gst', '1.0')
 gi.require_version('Gtk', '3.0')
 from gi.repository import GObject, Gst, Gtk
 
-imu_on = True
+STREAM_TYPE = 2
+ALIGN = 0
+IMU_ON = True
 
 class GTK_Main(object):
 
@@ -37,9 +39,9 @@ class GTK_Main(object):
         self.pipeline = Gst.Pipeline.new('realsense-stream')
 
         rssrc = Gst.ElementFactory.make('realsensesrc')
-        rssrc.set_property('stream-type', 2)
-        rssrc.set_property('align', 0)
-        rssrc.set_property('imu_on', imu_on)
+        rssrc.set_property('stream-type', STREAM_TYPE)
+        rssrc.set_property('align', ALIGN)
+        rssrc.set_property('imu_on', IMU_ON)
         
         rsdemux = Gst.ElementFactory.make('rsdemux', 'demux')
         rsdemux.connect('pad-added', self.demuxer_callback)
@@ -49,7 +51,7 @@ class GTK_Main(object):
         vidsink_depth = Gst.ElementFactory.make('autovideosink', 'sink-depth')
         self.queue_color = Gst.ElementFactory.make('queue', 'queue_color')
         self.queue_depth = Gst.ElementFactory.make('queue', 'queue_depth')
-        if imu_on:
+        if IMU_ON:
             self.queue_imu = Gst.ElementFactory.make('queue', 'queue-imu')
             sink_imu = Gst.ElementFactory.make('fakesink', 'sink-imu')
 
@@ -61,7 +63,7 @@ class GTK_Main(object):
         self.pipeline.add(vidsink_depth)
         self.pipeline.add(self.queue_color)
         self.pipeline.add(self.queue_depth)
-        if imu_on:
+        if IMU_ON:
             self.pipeline.add(self.queue_imu)
             self.pipeline.add(sink_imu)
 
@@ -77,7 +79,7 @@ class GTK_Main(object):
         if not ret:
             print('failed to link vidconvert to vidsink')
         
-        if imu_on:
+        if IMU_ON:
             self.queue_imu.link(sink_imu)
 
         ret = self.queue_depth.link(vidconvert_depth)
@@ -106,7 +108,7 @@ class GTK_Main(object):
             linked = pad.link(qd_pad)
             if linked != Gst.PadLinkReturn.OK:
                 print('failed to link demux to depth queue')
-        elif imu_on and pad.get_property("template").name_template == "imu":
+        elif IMU_ON and pad.get_property("template").name_template == "imu":
             qi_pad = self.queue_imu.get_static_pad("sink")
             linked = pad.link(qi_pad)
             if linked != Gst.PadLinkReturn.OK:
