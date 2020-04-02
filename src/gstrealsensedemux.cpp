@@ -342,22 +342,30 @@ static GstFlowReturn make_new_pads(GstRSDemux* rsdemux, const RSHeader& header)
         "framerate", GST_TYPE_FRACTION, 30, 1,
         NULL);
 
-  GstAudioInfo info;
-  constexpr gint imu_rate = GST_AUDIO_DEF_RATE;
-  constexpr gint imu_channels = 6; // x,y,z for accel and gyro
-  gst_audio_info_init(&info);
-  gst_audio_info_set_format(&info, static_cast<GstAudioFormat>(header.accel_format), imu_rate, imu_channels, NULL);
+  bool imu_on = GST_AUDIO_FORMAT_UNKNOWN != static_cast<GstAudioFormat>(header.accel_format);
+  if(imu_on)// || G_UNLIKELY(rsdemux->imusrcpad==nullptr))
+  {
+    GstAudioInfo info;
+    constexpr gint imu_rate = GST_AUDIO_DEF_RATE;
+    constexpr gint imu_channels = 6; // x,y,z for accel and gyro
+    gst_audio_info_init(&info);
+    gst_audio_info_set_format(&info, static_cast<GstAudioFormat>(header.accel_format), imu_rate, imu_channels, NULL);
 
-  const auto imu_caps = gst_audio_info_to_caps(&info);
+    const auto imu_caps = gst_audio_info_to_caps(&info);
+    rsdemux->imusrcpad = gst_rsdemux_add_pad(rsdemux, &imu_src_templ, imu_caps, "imu");
+    
+    gst_pad_set_caps (rsdemux->imusrcpad, imu_caps);
+    gst_caps_unref(imu_caps);
+  }
+  
   GST_CAT_DEBUG(rsdemux_debug, "made pad caps");
 
-  if (G_UNLIKELY (rsdemux->colorsrcpad == nullptr) || G_UNLIKELY(rsdemux->depthsrcpad==nullptr) || G_UNLIKELY(rsdemux->imusrcpad==nullptr)) 
+  if (G_UNLIKELY (rsdemux->colorsrcpad == nullptr) || G_UNLIKELY(rsdemux->depthsrcpad==nullptr)) 
   {
     GST_CAT_DEBUG(rsdemux_debug, "adding pads");
 
     rsdemux->colorsrcpad = gst_rsdemux_add_pad (rsdemux, &color_src_tmpl, color_caps, "color");
     rsdemux->depthsrcpad = gst_rsdemux_add_pad (rsdemux, &depth_src_tmpl, depth_caps, "depth");
-    rsdemux->imusrcpad = gst_rsdemux_add_pad(rsdemux, &imu_src_templ, imu_caps, "imu");
 
     if (rsdemux->colorsrcpad && rsdemux->depthsrcpad && rsdemux->imusrcpad)
       gst_element_no_more_pads (GST_ELEMENT (rsdemux));
@@ -366,12 +374,11 @@ static GstFlowReturn make_new_pads(GstRSDemux* rsdemux, const RSHeader& header)
   {
     gst_pad_set_caps (rsdemux->colorsrcpad, color_caps);
     gst_pad_set_caps (rsdemux->depthsrcpad, depth_caps);
-    gst_pad_set_caps (rsdemux->imusrcpad, imu_caps);
+
   }
   gst_caps_unref (color_caps);
   gst_caps_unref (depth_caps);
-  gst_caps_unref (imu_caps);
-
+  
   return GST_FLOW_OK;
 }
 
