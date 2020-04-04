@@ -14,13 +14,41 @@ The primary reason for this configuration is that GstBaseSrc, which GstPushSrc i
 ## Supported Models
 D435i has been tested.
 
+
+## Building
+As with GStreamer itself, the RealSense plugin uses the [Meson](https://mesonbuild.com/) build system. We have found this more user friendly than CMake. 
+
+The plugin has been developed and tested on Ubuntu 18.04.
+
+### Dependencies
+- GStreamer 1.0 or higher
+    - Follow the [instructions](https://gstreamer.freedesktop.org/documentation/installing/index.html?gi-language=c) for your operating system.
+- [Intel RealSense SDK](https://dev.intelrealsense.com/docs/installation)
+
+### Build steps
+
+1. Clone the repo and cd into repo directory.
+```
+git clone https://github.com/WKDSMRT/realsense-gstreamer.git
+cd realsense-gstreamer
+```
+2. Setup up build directory, build and install
+```
+meson . build
+sudo ninja -C build install
+```
+3. Inspect the resulting plugin.
+```
+gst-inspect-1.0 build/src/libgstrealsensesrc.so
+```
+
 ## To Do
 
 ### Open source release
 - set plugin defines specific to WKD.SMRT/RealSense
 - license
 - bump version (or automate version update)
-- build instructions
+- verify build instructions
 
 ### Source
 - Create bin element
