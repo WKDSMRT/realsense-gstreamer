@@ -12,16 +12,20 @@ The primary reason for this configuration is that GstBaseSrc, which GstPushSrc i
 [RealSense Reference](https://dev.intelrealsense.com/docs/api-architecture)
 
 ## Supported Models
-D435i is currently supported.
+D435i has been tested.
 
 ## To Do
+
+### Open source release
+- set plugin defines specific to WKD.SMRT/RealSense
+- license
+- bump version (or automate version update)
+- build instructions
+
 ### Source
-- control debug output and messages
 - Create bin element
-- Test application
 - Add metadata
     - What metadata is needed?
-- Add IMU data
 - src/rsmux.hpp:64:        /* TODO: use allocator or use from pool if that's more efficient or safer*/
 - src/rsmux.hpp:82:        // TODO refactor this section into cleaner code
 - src/rsmux.hpp:89:        /* TODO: use orc_memcpy */
@@ -31,13 +35,11 @@ D435i is currently supported.
 - src/gstrealsensedemux.cpp:317:    // TODO handle src pad events here
 - src/gstrealsensedemux.cpp:454:  // TODO What do we need to do in _flush?
 - src/gstrealsenseplugin.cpp:334:          // FIXME Not exact format match
-- set plugin defines specific to WKD.SMRT/RealSense
 - Maybe add capability to generate synthetic data if no camera is connected.
-    - Should be develop mode only
+    - Should be developer mode only
 
 ### Tests
-- Test application in Python or C++
-- The source may be run using gst-launch
+- The source may be run using gst-launch.
 ```
 gst-launch-1.0 -v -m realsensesrc ! videoconvert ! autovideosink
 ```
@@ -48,12 +50,5 @@ gst-launch-1.0 -v -m realsensesrc ! videoconvert ! autovideosink
 GST_PLUGIN_PATH=/usr/local/lib/gstreamer-1.0/
 export GST_PLUGIN_PATH
 ```
-- If the camera is not connected the plugin will fail to initialize. Running gst-inspect will give an error about "no valid klass field"
 
-```bash
-> gst-inspect-1.0 mbuild/src/libgstrealsensesrc.so
-
-(gst-inspect-1.0:24981): GStreamer-WARNING **: 20:31:47.666: Element factory metadata for 'realsensesrc' has no valid klass field
-Could not load plugin file: File "mbuild/src/libgstrealsensesrc.so" appears to be a GStreamer plugin, but it failed to initialize
-```
 - When aligning to the depth frame, some areas of rgb frame are blacked out. It's not clear with this is a RealSense bug or problem with the plugins. 
