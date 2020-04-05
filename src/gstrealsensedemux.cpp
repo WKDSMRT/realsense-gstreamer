@@ -1,16 +1,23 @@
+/*
+ * TODO add license
+ */
+
 /* GStreamer realsense demux
  *
  * SECTION:element-rsdemux
  * @title: rsdemux
  *
+ * Demuxer element to complement realsensesrc.
  * rsdemux splits muxed Realsense stream into its color and depth components. 
  *
  * ## Example launch line
  * |[
- *   gst-launch-1.0 -vvv -m realsensesrc stream-type=2 ! rsdemux name=demux \
- *     ! queue ! videoconvert ! autovideosink \
- *     demux. ! queue ! videoconvert ! autovideosink
+ *  gst-launch-1.0 -vvv -m realsensesrc stream-type=2 align=0 imu_on=True ! rsdemux name=demux \
+ *  ! queue ! videoconvert ! autovideosink \
+ *  demux. ! queue ! videoconvert ! autovideosink \
+ *  demux. ! queue ! fakesink
  * ]| 
+ * 
  * This pipeline captures realsense stream, demuxes it to color and depth
  * and renders them to videosinks.
  *
@@ -113,7 +120,7 @@ gst_rsdemux_class_init (GstRSDemuxClass * klass)
 
   gst_element_class_set_static_metadata (gstelement_class,
       "RealSense Source Demuxer", "Realsense Demuxer",
-      "Separate realsense stream into components: color, depth, IMU",
+      "Separate RealSense muxed stream into components: color, depth, IMU",
       "Tim Connelly <timpconnelly@gmail.com>");
 
   GST_DEBUG_CATEGORY_INIT (rsdemux_debug, "rsdemux", 0, "RS demuxer element");

@@ -1,4 +1,5 @@
 /*
+ * TODO add license
  */
 
 #ifndef __GST_REALSENSESRC_H__

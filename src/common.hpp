@@ -1,3 +1,7 @@
+/*
+ * TODO add license
+ */
+
 #ifndef __GST_RSCOMMON_H__
 #define __GST_RSCOMMON_H__
 

@@ -1,3 +1,7 @@
+/*
+ * TODO add license
+ */
+
 #ifndef __GST_RSMUX_H__
 #define __GST_RSMUX_H__
 

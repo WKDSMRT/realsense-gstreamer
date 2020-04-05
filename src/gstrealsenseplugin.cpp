@@ -11,12 +11,15 @@
  * and demux it themselves (use RSMux::demux) or use the rsdemux element to split
  * the color and depth into separate buffers.
  *
- * <refsect2>
- * <title>Example launch line</title>
+ * Example launch line
  * |[
  * gst-launch-1.0 -v -m realsensesrc ! videoconvert ! autovideosink
  * ]|
- * </refsect2>
+ * 
+ * The example pipeline will display muxed data, so the depth and IMU data 
+ * will not be displayed correctly. See rsdemux element to split the sources
+ * into seperate streams.
+ * 
  */
 
 #ifdef HAVE_CONFIG_H
