@@ -54,10 +54,11 @@ gst-inspect-1.0 build/src/libgstrealsensesrc.so
 - Create bin element
 - Add metadata
     - What metadata is needed?
-- src/rsmux.hpp:64:        /* TODO: use allocator or use from pool if that's more efficient or safer*/
-- src/rsmux.hpp:82:        // TODO refactor this section into cleaner code
-- src/rsmux.hpp:89:        /* TODO: use orc_memcpy */
+- Investigate buffer optimizations in rsmux.hpp
+    - use allocator or use from pool if that's more efficient or safer
+    - use orc_memcpy
 - src/gstrealsenseplugin.cpp:2: * TODO add license
+- src/rsmux.hpp:82:        // TODO refactor this section into cleaner code
 - src/gstrealsensedemux.cpp:205:  // TODO Handle any necessary src queries
 - src/gstrealsensedemux.cpp:221:  // TODO Handle any sink queries
 - src/gstrealsensedemux.cpp:317:    // TODO handle src pad events here
