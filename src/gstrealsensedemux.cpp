@@ -137,7 +137,7 @@ gst_rsdemux_class_init (GstRSDemuxClass * klass)
   gst_element_class_set_static_metadata (gstelement_class,
       "RealSense Source Demuxer", "Realsense Demuxer",
       "Separate RealSense muxed stream into components: color, depth, IMU",
-      "Tim Connelly <timpconnelly@gmail.com>");
+      "Tim Connelly/WKD.SMRT <timpconnelly@gmail.com>");
 
   GST_DEBUG_CATEGORY_INIT (rsdemux_debug, "rsdemux", 0, "RS demuxer element");
 }
