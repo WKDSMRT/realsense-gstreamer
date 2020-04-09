@@ -1,5 +1,21 @@
-/*
- * TODO add license
+/* GStreamer RealSense is a set of plugins to acquire frames from 
+ * Intel RealSense cameras into GStreamer pipeline.
+ * Copyright (C) <2020> Tim Connelly/WKD.SMRT <timpconnelly@gmail.com>
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the
+ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+ * Boston, MA 02110-1301, USA.
  */
 
 /**
@@ -11,12 +27,15 @@
  * and demux it themselves (use RSMux::demux) or use the rsdemux element to split
  * the color and depth into separate buffers.
  *
- * <refsect2>
- * <title>Example launch line</title>
+ * Example launch line
  * |[
  * gst-launch-1.0 -v -m realsensesrc ! videoconvert ! autovideosink
  * ]|
- * </refsect2>
+ * 
+ * The example pipeline will display muxed data, so the depth and IMU data 
+ * will not be displayed correctly. See rsdemux element to split the sources
+ * into seperate streams.
+ * 
  */
 
 #ifdef HAVE_CONFIG_H
@@ -101,7 +120,7 @@ gst_realsense_src_class_init (GstRealsenseSrcClass * klass)
     "RealsenseSrc",
     "Source/Video/Sensors",
     "Source element for Intel RealSense multiplexed video, depth and IMU data",
-    "Tim Connelly <<timpconnelly@gmail.com>>");
+    "Tim Connelly/WKD.SMRT <<timpconnelly@gmail.com>>");
 
   // gst_element_class_add_pad_template (gstelement_class,
   //     gst_static_pad_template_get (&src_factory));

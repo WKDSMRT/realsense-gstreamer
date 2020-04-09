@@ -1,16 +1,39 @@
+/* GStreamer RealSense is a set of plugins to acquire frames from 
+ * Intel RealSense cameras into GStreamer pipeline.
+ * Copyright (C) <2020> Tim Connelly/WKD.SMRT <timpconnelly@gmail.com>
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the
+ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+ * Boston, MA 02110-1301, USA.
+ */
+
 /* GStreamer realsense demux
  *
  * SECTION:element-rsdemux
  * @title: rsdemux
  *
+ * Demuxer element to complement realsensesrc.
  * rsdemux splits muxed Realsense stream into its color and depth components. 
  *
  * ## Example launch line
  * |[
- *   gst-launch-1.0 -vvv -m realsensesrc stream-type=2 ! rsdemux name=demux \
- *     ! queue ! videoconvert ! autovideosink \
- *     demux. ! queue ! videoconvert ! autovideosink
+ *  gst-launch-1.0 -vvv -m realsensesrc stream-type=2 align=0 imu_on=True ! rsdemux name=demux \
+ *  ! queue ! videoconvert ! autovideosink \
+ *  demux. ! queue ! videoconvert ! autovideosink \
+ *  demux. ! queue ! fakesink
  * ]| 
+ * 
  * This pipeline captures realsense stream, demuxes it to color and depth
  * and renders them to videosinks.
  *
@@ -113,8 +136,8 @@ gst_rsdemux_class_init (GstRSDemuxClass * klass)
 
   gst_element_class_set_static_metadata (gstelement_class,
       "RealSense Source Demuxer", "Realsense Demuxer",
-      "Separate realsense stream into components: color, depth, IMU",
-      "Tim Connelly <timpconnelly@gmail.com>");
+      "Separate RealSense muxed stream into components: color, depth, IMU",
+      "Tim Connelly/WKD.SMRT <timpconnelly@gmail.com>");
 
   GST_DEBUG_CATEGORY_INIT (rsdemux_debug, "rsdemux", 0, "RS demuxer element");
 }

@@ -1,3 +1,23 @@
+/* GStreamer RealSense is a set of plugins to acquire frames from 
+ * Intel RealSense cameras into GStreamer pipeline.
+ * Copyright (C) <2020> Tim Connelly/WKD.SMRT <timpconnelly@gmail.com>
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the
+ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+ * Boston, MA 02110-1301, USA.
+ */
+
 #ifndef __GST_RSMUX_H__
 #define __GST_RSMUX_H__
 
@@ -61,7 +81,6 @@ public:
         }
         constexpr auto header_sz = sizeof(RSHeader);
 
-        /* TODO: use allocator or use from pool if that's more efficient or safer*/
         const auto buffer_sz = header_sz + color_sz + depth_sz + imu_sz + 1;
         buffer = gst_buffer_new_and_alloc(buffer_sz);
         if (buffer == nullptr)
@@ -86,7 +105,6 @@ public:
         int rs_stride = 0;
         auto outdata = minfo.data + sizeof(RSHeader);
         rs_stride = cframe.get_stride_in_bytes();
-        /* TODO: use orc_memcpy */
         if (src->gst_stride == rs_stride)
         {
             memcpy(outdata, ((guint8 *)cframe.get_data()), color_sz);

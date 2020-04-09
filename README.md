@@ -12,32 +12,63 @@ The primary reason for this configuration is that GstBaseSrc, which GstPushSrc i
 [RealSense Reference](https://dev.intelrealsense.com/docs/api-architecture)
 
 ## Supported Models
-D435i is currently supported.
+D435i has been tested.
+
+
+## Building
+As with GStreamer itself, the RealSense plugin uses the [Meson](https://mesonbuild.com/) build system. We have found this more user friendly than CMake. 
+
+The plugin has been developed and tested on Ubuntu 18.04.
+
+### Dependencies
+- GStreamer 1.0 or higher
+    - Follow the [instructions](https://gstreamer.freedesktop.org/documentation/installing/index.html?gi-language=c) for your operating system.
+- [Intel RealSense SDK](https://dev.intelrealsense.com/docs/installation)
+
+### Build steps
+
+1. Clone the repo and cd into repo directory.
+```
+git clone https://github.com/WKDSMRT/realsense-gstreamer.git
+cd realsense-gstreamer
+```
+2. Setup up build directory, build and install
+```
+meson . build
+sudo ninja -C build install
+```
+3. Inspect the resulting plugin.
+```
+gst-inspect-1.0 build/src/libgstrealsensesrc.so
+```
 
 ## To Do
+
+### Open source release
+- set plugin defines specific to WKD.SMRT/RealSense
+- license
+- bump version (or automate version update)
+- verify build instructions
+
 ### Source
-- control debug output and messages
 - Create bin element
-- Test application
 - Add metadata
     - What metadata is needed?
-- Add IMU data
-- src/rsmux.hpp:64:        /* TODO: use allocator or use from pool if that's more efficient or safer*/
-- src/rsmux.hpp:82:        // TODO refactor this section into cleaner code
-- src/rsmux.hpp:89:        /* TODO: use orc_memcpy */
+- Investigate buffer optimizations in rsmux.hpp
+    - use allocator or use from pool if that's more efficient or safer
+    - use orc_memcpy
 - src/gstrealsenseplugin.cpp:2: * TODO add license
+- src/rsmux.hpp:82:        // TODO refactor this section into cleaner code
 - src/gstrealsensedemux.cpp:205:  // TODO Handle any necessary src queries
 - src/gstrealsensedemux.cpp:221:  // TODO Handle any sink queries
 - src/gstrealsensedemux.cpp:317:    // TODO handle src pad events here
 - src/gstrealsensedemux.cpp:454:  // TODO What do we need to do in _flush?
 - src/gstrealsenseplugin.cpp:334:          // FIXME Not exact format match
-- set plugin defines specific to WKD.SMRT/RealSense
 - Maybe add capability to generate synthetic data if no camera is connected.
-    - Should be develop mode only
+    - Should be developer mode only
 
 ### Tests
-- Test application in Python or C++
-- The source may be run using gst-launch
+- The source may be run using gst-launch.
 ```
 gst-launch-1.0 -v -m realsensesrc ! videoconvert ! autovideosink
 ```
@@ -48,12 +79,5 @@ gst-launch-1.0 -v -m realsensesrc ! videoconvert ! autovideosink
 GST_PLUGIN_PATH=/usr/local/lib/gstreamer-1.0/
 export GST_PLUGIN_PATH
 ```
-- If the camera is not connected the plugin will fail to initialize. Running gst-inspect will give an error about "no valid klass field"
 
-```bash
-> gst-inspect-1.0 mbuild/src/libgstrealsensesrc.so
-
-(gst-inspect-1.0:24981): GStreamer-WARNING **: 20:31:47.666: Element factory metadata for 'realsensesrc' has no valid klass field
-Could not load plugin file: File "mbuild/src/libgstrealsensesrc.so" appears to be a GStreamer plugin, but it failed to initialize
-```
 - When aligning to the depth frame, some areas of rgb frame are blacked out. It's not clear with this is a RealSense bug or problem with the plugins. 
