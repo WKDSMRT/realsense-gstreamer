@@ -4,7 +4,7 @@ GStreamer source plugin for the Intel RealSense line of cameras.
 
 The plugin is actually two elements, a pure source and a demuxer. The source is set up as a GstPushSrc, based on [gst-vision-plugins](https://github.com/joshdoe/gst-plugins-vision) and GstVideoTestSrc. The demuxer is based on GstDVDemux from the gst-plugins-good package. 
 
-The source element combines color and depth channels  and IMU into a single buffer passed to out thru its source pad. The demuxer receives that buffer on its sink pad and splits it into color, depth and IMU buffers and and passes the buffers into the respective source pads. The IMU pad is configured as an audio pad with 6 channels of 32-bit floating point data.
+The source element combines color and depth channels  and IMU into a single buffer passed to its source pad. The demuxer receives that buffer on its sink pad and splits it into color, depth and IMU buffers and and passes the buffers into the respective source pads. The IMU pad is configured as an audio pad with 6 channels of 32-bit floating point data.
 
 The primary reason for this configuration is that GstBaseSrc, which GstPushSrc inherits, allows for only a single source pad. The use of the demuxer is not required. A downstream element may demux the itself buffer. This may be useful for processing that requires synchronized color and depth information.
 
@@ -44,12 +44,6 @@ gst-inspect-1.0 build/src/libgstrealsensesrc.so
 
 ## To Do
 
-### Open source release
-- set plugin defines specific to WKD.SMRT/RealSense
-- license
-- bump version (or automate version update)
-- verify build instructions
-
 ### Source
 - Create bin element
 - Add metadata
@@ -57,7 +51,6 @@ gst-inspect-1.0 build/src/libgstrealsensesrc.so
 - Investigate buffer optimizations in rsmux.hpp
     - use allocator or use from pool if that's more efficient or safer
     - use orc_memcpy
-- src/gstrealsenseplugin.cpp:2: * TODO add license
 - src/rsmux.hpp:82:        // TODO refactor this section into cleaner code
 - src/gstrealsensedemux.cpp:205:  // TODO Handle any necessary src queries
 - src/gstrealsensedemux.cpp:221:  // TODO Handle any sink queries
@@ -80,4 +73,4 @@ GST_PLUGIN_PATH=/usr/local/lib/gstreamer-1.0/
 export GST_PLUGIN_PATH
 ```
 
-- When aligning to the depth frame, some areas of rgb frame are blacked out. It's not clear with this is a RealSense bug or problem with the plugins. 
+- When aligning to the depth frame, some areas of the rgb frame are blacked out. It's not clear if this is a RealSense bug or problem with the plugins. 
