@@ -52,27 +52,37 @@ gst-launch-1.0 -v -m realsensesrc ! videoconvert ! autovideosink
 Several properties are implemented to control the function of the source plugin.
 
 
-**cam-serial-number**: Specifies serial number of the camera to open. If no serial number is specified the plugin will open the first found RealSense device.
+#### cam-serial-number
+Specifies serial number of the camera to open. If no serial number is specified the plugin will open the first found RealSense device.
 
-**align** : Controls the alignement between the color and depth frames.
+#### align 
+Controls the alignement between the color and depth frames.
 | Value | Effect|
 |--- | --- |
 | 0 (Default) | No alignment |
 | 1 | Align to color frame |
 | 2 | Align to depth frame |
 
-**imu_on**: Turns IMU streaming on/off.
+#### imu_on
+Turns IMU streaming on/off.
 | Value | Effect|
 |--- | --- |
 | True | IMU streaming |
 | False | IMU not streaming |
 
-**stream-type**: The stream-type property can control which video feed is created by the source: color, depth or multiplexed.
+#### stream-type
+The stream-type property can control which video feed is created by the source: color, depth or multiplexed.
 | Value | Effect|
 |--- | --- |
 | 0 | Color frames only |
 | 1 (Default) | Depth frames only |
 | 2 | Multiplxed Color and depth frames |
+
+#### Example
+The following gst-launch command exercises all the configurable properties of the source element.
+```
+gst-launch-1.0 realsensesrc cam-serial-number=918512070217 stream-type=2 align=0 imu_on=True ! videoconvert ! autovideosink 
+```
 
 ## To Do
 
