@@ -5,7 +5,6 @@
 #include <gst/video/video.h>
 
 #include <string>
-#include <memory>
 
 G_BEGIN_DECLS
 
@@ -13,12 +12,11 @@ G_BEGIN_DECLS
 #define GST_REALSENSE_META_INFO  (gst_realsense_meta_get_info())
 typedef struct _GstRealsenseMeta GstRealsenseMeta;
 
-using str_ptr = std::unique_ptr<std::string>;
 struct _GstRealsenseMeta {
   GstMeta            meta;
 
-  str_ptr cam_model;
-  str_ptr cam_serial_number;
+  std::string cam_model;
+  std::string cam_serial_number;
 
   uint exposure = 0;
 };

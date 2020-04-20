@@ -23,8 +23,8 @@ static gboolean gst_realsense_meta_transform (GstBuffer * dest, GstMeta * meta,
 {
     GstRealsenseMeta* source_meta = reinterpret_cast<GstRealsenseMeta*>(meta);
     GstRealsenseMeta* dest_meta = gst_buffer_add_realsense_meta(dest, 
-            source_meta->cam_model->c_str(),
-            source_meta->cam_serial_number->c_str(),
+            source_meta->cam_model.c_str(),
+            source_meta->cam_serial_number.c_str(),
             source_meta->exposure);
     return dest_meta != nullptr;
 }
@@ -33,10 +33,8 @@ static gboolean gst_realsense_meta_init (GstMeta * meta, gpointer params,
                                       GstBuffer * buffer)
 {
     GstRealsenseMeta* emeta = reinterpret_cast<GstRealsenseMeta*>(meta);
-    // char* data = reinterpret_cast<char*>(params); where does params come from?
-    // emeta->str = new std::string(data);
-    emeta->cam_model = nullptr; //std::make_unique<std::string>();
-    emeta->cam_serial_number = nullptr; //= std::make_unique<std::string>();
+    emeta->cam_model.clear();
+    emeta->cam_serial_number.clear();
     emeta->exposure = 0;
 
     return TRUE;
@@ -44,9 +42,6 @@ static gboolean gst_realsense_meta_init (GstMeta * meta, gpointer params,
 
 static void gst_realsense_meta_free (GstMeta * meta, GstBuffer * buffer)
 {
-    // should all be done automatically
-    // GstRealsenseMeta* emeta = reinterpret_cast<GstRealsenseMeta*>(meta);
-    // delete emeta->str;
 }
 
 const GstMetaInfo * gst_realsense_meta_get_info (void)
@@ -77,8 +72,8 @@ gst_buffer_add_realsense_meta (GstBuffer * buffer,
     auto meta = 
         reinterpret_cast<GstRealsenseMeta*>(gst_buffer_add_meta(buffer, GST_REALSENSE_META_INFO, nullptr));//reinterpret_cast<gpointer>(const_cast<char*>(data)));
 
-    meta->cam_model = std::make_unique<std::string>(model);
-    meta->cam_serial_number = std::make_unique<std::string>(serial_number);
+    meta->cam_model = model;
+    meta->cam_serial_number = serial_number;
     meta->exposure = exposure;
 
     return meta;
