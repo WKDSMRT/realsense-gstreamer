@@ -23,7 +23,8 @@ realsense_dep = dependency('realsense2')
 plugin_sources = [
   'gstrealsenseplugin.cpp',
   'gstrealsensedemux.cpp',
-  'rsmux.hpp'
+  'rsmux.hpp',
+  'gstrealsensemeta.cpp'
   ]
 
 gstpluginexample = library('gstrealsensesrc',
