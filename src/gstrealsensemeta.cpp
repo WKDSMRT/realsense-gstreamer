@@ -23,9 +23,10 @@ static gboolean gst_realsense_meta_transform (GstBuffer * dest, GstMeta * meta,
 {
     GstRealsenseMeta* source_meta = reinterpret_cast<GstRealsenseMeta*>(meta);
     GstRealsenseMeta* dest_meta = gst_buffer_add_realsense_meta(dest, 
-            source_meta->cam_model.c_str(),
-            source_meta->cam_serial_number.c_str(),
-            source_meta->exposure);
+            *source_meta->cam_model,
+            *source_meta->cam_serial_number,
+            source_meta->exposure,
+            *source_meta->json_descr);
     return dest_meta != nullptr;
 }
 
@@ -33,8 +34,9 @@ static gboolean gst_realsense_meta_init (GstMeta * meta, gpointer params,
                                       GstBuffer * buffer)
 {
     GstRealsenseMeta* emeta = reinterpret_cast<GstRealsenseMeta*>(meta);
-    emeta->cam_model.clear();
-    emeta->cam_serial_number.clear();
+    emeta->cam_model = nullptr;
+    emeta->cam_serial_number = nullptr;
+    emeta->json_descr = nullptr;
     emeta->exposure = 0;
 
     return TRUE;
@@ -42,6 +44,10 @@ static gboolean gst_realsense_meta_init (GstMeta * meta, gpointer params,
 
 static void gst_realsense_meta_free (GstMeta * meta, GstBuffer * buffer)
 {
+    auto rsmeta = reinterpret_cast<GstRealsenseMeta*>(meta);
+    delete rsmeta->cam_model;
+    delete rsmeta->cam_serial_number;
+    delete rsmeta->json_descr;
 }
 
 const GstMetaInfo * gst_realsense_meta_get_info (void)
@@ -65,15 +71,17 @@ GstRealsenseMeta *
 gst_buffer_add_realsense_meta (GstBuffer * buffer, 
         const std::string model,
         const std::string serial_number,
-        const uint exposure)
+        const uint exposure,
+        const std::string json_descr)
 {
     g_return_val_if_fail (GST_IS_BUFFER (buffer), nullptr);
 
     auto meta = 
         reinterpret_cast<GstRealsenseMeta*>(gst_buffer_add_meta(buffer, GST_REALSENSE_META_INFO, nullptr));//reinterpret_cast<gpointer>(const_cast<char*>(data)));
 
-    meta->cam_model = model;
-    meta->cam_serial_number = serial_number;
+    meta->cam_model = new std::string(model);
+    meta->cam_serial_number = new std::string(serial_number);
+    meta->json_descr = new std::string(json_descr);
     meta->exposure = exposure;
 
     return meta;

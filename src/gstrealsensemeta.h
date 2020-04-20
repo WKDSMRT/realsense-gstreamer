@@ -15,9 +15,9 @@ typedef struct _GstRealsenseMeta GstRealsenseMeta;
 struct _GstRealsenseMeta {
   GstMeta            meta;
 
-  std::string cam_model;
-  std::string cam_serial_number;
-
+  std::string* cam_model;
+  std::string* cam_serial_number;
+  std::string* json_descr; // generic json descriptor
   uint exposure = 0;
 };
 
@@ -28,7 +28,8 @@ const GstMetaInfo *gst_realsense_meta_get_info (void);
 GstRealsenseMeta *gst_buffer_add_realsense_meta(GstBuffer* buffer, 
         const std::string model,
         const std::string serial_number,
-        uint exposure
+        uint exposure, 
+        const std::string json_descr
         );
 
 // for python access
