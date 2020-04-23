@@ -22,12 +22,24 @@ static gboolean gst_realsense_meta_transform (GstBuffer * dest, GstMeta * meta,
                                            GstBuffer * buffer, GQuark type, gpointer data)
 {
     GstRealsenseMeta* source_meta = reinterpret_cast<GstRealsenseMeta*>(meta);
-    GstRealsenseMeta* dest_meta = gst_buffer_add_realsense_meta(dest, 
+    
+    if(GST_META_TRANSFORM_IS_COPY(type))
+    {
+        GstRealsenseMeta* dest_meta = gst_buffer_add_realsense_meta(
+            dest, 
             *source_meta->cam_model,
             *source_meta->cam_serial_number,
             source_meta->exposure,
             *source_meta->json_descr);
-    return dest_meta != nullptr;
+        if(dest_meta == nullptr)
+            return false;
+    }
+    else
+    {
+        return false;
+    }
+    
+    return false;
 }
 
 static gboolean gst_realsense_meta_init (GstMeta * meta, gpointer params,
@@ -67,8 +79,7 @@ const GstMetaInfo * gst_realsense_meta_get_info (void)
     return meta_info;
 }
 
-GstRealsenseMeta *
-gst_buffer_add_realsense_meta (GstBuffer * buffer, 
+GstRealsenseMeta* gst_buffer_add_realsense_meta (GstBuffer * buffer, 
         const std::string model,
         const std::string serial_number,
         const uint exposure,

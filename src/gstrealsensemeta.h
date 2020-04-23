@@ -23,7 +23,7 @@ struct _GstRealsenseMeta {
 
 GType gst_realsense_meta_api_get_type (void);
 const GstMetaInfo *gst_realsense_meta_get_info (void);
-#define gst_buffer_get_realsense_meta(b) ((GstStringMeta*)gst_buffer_get_meta((b),GST_REALSENSE_META_API_TYPE))
+#define gst_buffer_get_realsense_meta(b) ((GstRealsenseMeta*)gst_buffer_get_meta((b),GST_REALSENSE_META_API_TYPE))
 
 GstRealsenseMeta *gst_buffer_add_realsense_meta(GstBuffer* buffer, 
         const std::string model,
