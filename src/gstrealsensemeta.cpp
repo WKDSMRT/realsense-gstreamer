@@ -1,5 +1,7 @@
 
 #include <gst/gst.h>
+#include <gst/video/video.h>
+
 #include <gstrealsensemeta.h>
 
 #include <iostream>
@@ -9,7 +11,7 @@ GType gst_realsense_meta_api_get_type (void)
     static volatile GType type;
 
     if (g_once_init_enter (&type)) {
-        static const gchar *tags[] = { NULL };
+        static const gchar *tags[] = { GST_META_TAG_VIDEO_STR, "sensor", NULL };
         GType _type = gst_meta_api_type_register ("GstRealsenseMetaAPI", tags);
         GST_INFO ("registering");
         g_once_init_leave (&type, _type);
@@ -60,6 +62,7 @@ static void gst_realsense_meta_free (GstMeta * meta, GstBuffer * buffer)
     delete rsmeta->cam_model;
     delete rsmeta->cam_serial_number;
     delete rsmeta->json_descr;
+    rsmeta->exposure = 0;
 }
 
 const GstMetaInfo * gst_realsense_meta_get_info (void)

@@ -430,7 +430,7 @@ gst_rsdemux_demux_video (GstRSDemux * rsdemux, GstBuffer * buffer)
 
   // meta
   GST_CAT_DEBUG(rsdemux_debug, "copying metadata");
-  // TODO We should use the transform method, but that segfaults when doing a second copy
+  // TODO Should we use the transform method, but that segfaults when doing a second transform
   auto rsmeta = gst_buffer_get_realsense_meta(buffer);
   gst_buffer_add_realsense_meta(colorbuf, *rsmeta->cam_model, *rsmeta->cam_serial_number,rsmeta->exposure,*rsmeta->json_descr);
   gst_buffer_add_realsense_meta(depthbuf, *rsmeta->cam_model, *rsmeta->cam_serial_number,rsmeta->exposure,*rsmeta->json_descr);
