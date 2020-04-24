@@ -47,7 +47,7 @@
 #include <gst/audio/audio.h>
 
 #include "gstrealsensedemux.h"
-#include "gstrealsenseplugin.h"
+#include "gstrealsensesrc.h"
 #include "gstrealsensemeta.h"
 
 #include "rsmux.hpp"
@@ -96,7 +96,9 @@ static GstStaticPadTemplate imu_src_templ = GST_STATIC_PAD_TEMPLATE ("imu",
     );
 
 #define gst_rsdemux_parent_class parent_class
-G_DEFINE_TYPE (GstRSDemux, gst_rsdemux, GST_TYPE_ELEMENT);
+G_DEFINE_TYPE_WITH_CODE (GstRSDemux, gst_rsdemux, GST_TYPE_ELEMENT, 
+  GST_DEBUG_CATEGORY_INIT(rsdemux_debug, "rsdemux", 0, 
+  "Demux element for Realsense plugin"));
 
 static void gst_rsdemux_finalize (GObject * object);
 

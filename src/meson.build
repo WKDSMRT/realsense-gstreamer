@@ -19,9 +19,10 @@ gstaudio_dep = dependency('gstreamer-audio-1.0',
 
 realsense_dep = dependency('realsense2')
 
-# Plugin 1
+# Realsense Plugin
 plugin_sources = [
   'gstrealsenseplugin.cpp',
+  'gstrealsensesrc.cpp',
   'gstrealsensedemux.cpp',
   'rsmux.hpp',
   'gstrealsensemeta.cpp'
