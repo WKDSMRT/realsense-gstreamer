@@ -56,8 +56,6 @@
 GST_DEBUG_CATEGORY_STATIC (gst_realsense_src_debug);
 #define GST_CAT_DEFAULT gst_realsense_src_debug
 
-#define POST_MESSAGE(src, msg) gst_element_post_message(GST_ELEMENT_CAST((src)), gst_message_new_info(GST_OBJECT_CAST((src)), NULL, (msg)))
-
 enum
 {
   PROP_0,
@@ -266,8 +264,7 @@ static void calculate_frame_rate(GstRealsenseSrc* src, GstClockTime new_time)
 
   const auto mean_fr = fpns_to_fps * static_cast<double>(src->frame_count) / static_cast<double>(new_time);
 
-  GST_CAT_DEBUG(gst_realsense_src_debug, "New time: %lu, Prev time: %lu, Frame count: %lu", new_time, src->prev_time, src->frame_count);
-  POST_MESSAGE(src, _gst_element_error_printf("Instant frame rate: %.02f, Avg frame rate: %.2f", instant_fr, mean_fr));
+  GST_CAT_DEBUG(gst_realsense_src_debug, "Instant frame rate: %.02f, Avg frame rate: %.2f", instant_fr, mean_fr);
 }
 
 static GstFlowReturn
