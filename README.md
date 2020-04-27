@@ -88,8 +88,6 @@ gst-launch-1.0 realsensesrc cam-serial-number=918512070217 stream-type=2 align=0
 
 ### Source
 - Create bin element
-- Add metadata
-    - What metadata is needed?
 - Investigate buffer optimizations in rsmux.hpp
     - use allocator or use from pool if that's more efficient or safer
     - use orc_memcpy
