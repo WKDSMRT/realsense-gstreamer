@@ -47,7 +47,8 @@
 #include <gst/audio/audio.h>
 
 #include "gstrealsensedemux.h"
-#include "gstrealsenseplugin.h"
+#include "gstrealsensesrc.h"
+#include "gstrealsensemeta.h"
 
 #include "rsmux.hpp"
 #include <stdexcept>
@@ -95,7 +96,9 @@ static GstStaticPadTemplate imu_src_templ = GST_STATIC_PAD_TEMPLATE ("imu",
     );
 
 #define gst_rsdemux_parent_class parent_class
-G_DEFINE_TYPE (GstRSDemux, gst_rsdemux, GST_TYPE_ELEMENT);
+G_DEFINE_TYPE_WITH_CODE (GstRSDemux, gst_rsdemux, GST_TYPE_ELEMENT, 
+  GST_DEBUG_CATEGORY_INIT(rsdemux_debug, "rsdemux", 0, 
+  "Demux element for Realsense plugin"));
 
 static void gst_rsdemux_finalize (GObject * object);
 
@@ -427,6 +430,15 @@ gst_rsdemux_demux_video (GstRSDemux * rsdemux, GstBuffer * buffer)
   // outbuf = gst_buffer_make_writable (buffer);
   auto [colorbuf, depthbuf, imubuf] = RSMux::demux(buffer, header);
 
+  // meta
+  GST_CAT_DEBUG(rsdemux_debug, "copying metadata");
+  // TODO Should we use the transform method, but that segfaults when doing a second transform
+  auto rsmeta = gst_buffer_get_realsense_meta(buffer);
+  gst_buffer_add_realsense_meta(colorbuf, *rsmeta->cam_model, *rsmeta->cam_serial_number,rsmeta->exposure,*rsmeta->json_descr);
+  gst_buffer_add_realsense_meta(depthbuf, *rsmeta->cam_model, *rsmeta->cam_serial_number,rsmeta->exposure,*rsmeta->json_descr);
+  if(imubuf != nullptr && rsdemux->imusrcpad != nullptr)
+    gst_buffer_add_realsense_meta(imubuf, *rsmeta->cam_model, *rsmeta->cam_serial_number,rsmeta->exposure,*rsmeta->json_descr);
+
   GST_CAT_DEBUG(rsdemux_debug, "pushing buffers");
 
   ret = gst_pad_push (rsdemux->colorsrcpad, colorbuf);
@@ -461,7 +473,7 @@ gst_rsdemux_demux_frame (GstRSDemux * rsdemux, GstBuffer * buffer)
   {
     vret = ret = gst_rsdemux_demux_video (rsdemux, buffer);
     if (G_UNLIKELY (ret != GST_FLOW_OK && ret != GST_FLOW_NOT_LINKED))
-      throw new std::runtime_error("gst_rsdemux_demux_video failed"); //goto done;
+      throw new std::runtime_error("gst_rsdemux_demux_video failed"); 
     
     
     /* if both are not linked, we stop */

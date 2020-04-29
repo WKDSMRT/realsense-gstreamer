@@ -5,7 +5,7 @@ cdata.set_quoted('PACKAGE_VERSION', project_version)
 cdata.set_quoted('PACKAGE', 'gst-realsensesrc-plugin')
 
 # used in plugin creation
-cdata.set_quoted('GST_LICENSE', 'LGPL') # FIXME with real license
+cdata.set_quoted('GST_LICENSE', 'LGPL') 
 cdata.set_quoted('GST_API_VERSION', gst_api_version)
 cdata.set_quoted('GST_PACKAGE_NAME', 'GStreamer RealSense Source Plug-ins')
 cdata.set_quoted('GST_PACKAGE_ORIGIN', 'https://github.com/WKDSMRT/realsense-gstreamer')
@@ -19,11 +19,13 @@ gstaudio_dep = dependency('gstreamer-audio-1.0',
 
 realsense_dep = dependency('realsense2')
 
-# Plugin 1
+# Realsense Plugin
 plugin_sources = [
   'gstrealsenseplugin.cpp',
+  'gstrealsensesrc.cpp',
   'gstrealsensedemux.cpp',
-  'rsmux.hpp'
+  'rsmux.hpp',
+  'gstrealsensemeta.cpp'
   ]
 
 gstpluginexample = library('gstrealsensesrc',

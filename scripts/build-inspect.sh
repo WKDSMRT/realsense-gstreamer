@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e
 
 # meson . build
 sudo ninja -C build install

@@ -84,12 +84,19 @@ The following gst-launch command exercises all the configurable properties of th
 gst-launch-1.0 realsensesrc cam-serial-number=918512070217 stream-type=2 align=0 imu_on=True ! videoconvert ! autovideosink 
 ```
 
+### Metadata
+The following information is added to buffer metadata as a GstMeta struct.
+
+- Camera model
+- Camera serial number
+- Exposure 
+
+The Realsense library exposes many other metadata values. The GstMeta struct can be added to if other Realsense metadata is needed by downstream elements.
+
 ## To Do
 
 ### Source
 - Create bin element
-- Add metadata
-    - What metadata is needed?
 - Investigate buffer optimizations in rsmux.hpp
     - use allocator or use from pool if that's more efficient or safer
     - use orc_memcpy
