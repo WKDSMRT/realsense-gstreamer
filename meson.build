@@ -3,8 +3,7 @@ project('realsensesrc', 'cpp',
     meson_version : '>= 0.53',
      license : 'LGPL')
 
-#plugins_install_dir = join_paths(get_option('libdir'), 'gstreamer-1.0')
-plugins_install_dir = '/usr/local/lib/gstreamer-1.0/'
+plugins_install_dir = join_paths(get_option('libdir'), 'gstreamer-1.0')
 
 project_version = meson.project_version()
 
