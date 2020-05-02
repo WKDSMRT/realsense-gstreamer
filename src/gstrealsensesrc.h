@@ -59,6 +59,7 @@ struct _GstRealsenseSrc
   GstVideoInfo info; /* protected by the object or stream lock */
 
   gboolean silent;
+  gboolean stop_requested = FALSE;
 
   GstCaps *caps;
   gint height;
