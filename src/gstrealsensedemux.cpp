@@ -455,6 +455,7 @@ gst_rsdemux_demux_video (GstRSDemux * rsdemux, GstBuffer * buffer)
       GST_ELEMENT_WARNING(rsdemux, RESOURCE, SETTINGS, ("Pushing to IMU src gave %d.", ret), (NULL));
   }
 
+  gst_buffer_unref(buffer);
   // FIXME BUG if app is killed while flushing. results in std::runtime_error and crash
   return ret;
 }
