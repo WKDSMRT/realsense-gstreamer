@@ -56,6 +56,7 @@ struct _GstRSDemux {
   gint           in_stride_bytes;
 
   gint           frame_count = 0;
+  GstStateChange state_change = GST_STATE_CHANGE_NULL_TO_NULL;
 };
 
 struct _GstRSDemuxClass 

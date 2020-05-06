@@ -1,10 +1,14 @@
 #!/usr/bin/env python3
 
 import sys, os
+import time
+
 import gi
 gi.require_version('Gst', '1.0')
 gi.require_version('Gtk', '3.0')
 from gi.repository import Gst, GObject, Gtk
+
+use_appsink = True
 
 class GTK_Main:
     def __init__(self):
@@ -25,13 +29,23 @@ class GTK_Main:
         hbox.pack_start(self.button, False, False, 0)
         self.button2 = Gtk.Button("Quit")
         self.button2.connect("clicked", self.exit)
+        self.start_time = 0
+        self.prev_time = None
+        self.frame_count = 0
         hbox.pack_start(self.button2, False, False, 0)
         hbox.add(Gtk.Label())
         window.show_all()
 
-        pipeline_str = 'realsensesrc stream-type=2 align=0 imu_on=false ! \
-            rsdemux name=demux ! queue ! videoconvert ! autovideosink \
+        if use_appsink:
+            color_sink = "appsink name=sink emit-signals=true"
+        else:
+            color_sink = "autovideosink"
+
+        pipeline_str = f'realsensesrc stream-type=2 align=0 imu_on=false ! \
+            rsdemux name=demux ! queue ! videoconvert ! {color_sink} \
                 demux. ! queue ! videoconvert ! autovideosink'
+
+
         # Set up the gstreamer pipeline
         self.player = Gst.parse_launch (pipeline_str)
         bus = self.player.get_bus()
@@ -39,17 +53,45 @@ class GTK_Main:
         bus.enable_sync_message_emission()
         bus.connect("message", self.on_message)
         bus.connect("sync-message::element", self.on_sync_message)
+        
+        if use_appsink:
+            sink_element = self.player.get_by_name("sink")
+            sink_element.connect('new-sample', self.on_new_sample)
 
     def start_stop(self, w):
         if self.button.get_label() == "Start":
             self.button.set_label("Stop")
             self.player.set_state(Gst.State.PLAYING)
+            self.start_time = time.time()
         else:
             self.player.set_state(Gst.State.NULL)
             self.button.set_label("Start")
+            self.start_time = 0
 
     def exit(self, widget, data=None):
         Gtk.main_quit()
+
+    def on_new_sample(self, sink):
+        sample = sink.emit('pull-sample')
+        buffer = sample.get_buffer()
+        t = time.time()
+        if buffer:
+            # do something with the video buffer, if desired
+            pass
+
+        if self.prev_time is None:
+            self.prev_time = t
+            inst_fr = 0
+        else:
+            inst_fr = 1.0 / (t - self.prev_time)
+            self.prev_time = t
+        
+        elapsed = t - self.start_time
+        self.frame_count += 1
+        mean_fr = self.frame_count / elapsed
+        
+        print(f'mean frame rate = {mean_fr:04.2f}, instant frame rate = {inst_fr:04.2f}')
+        return Gst.FlowReturn.OK
 
     def on_message(self, bus, message):
         t = message.type

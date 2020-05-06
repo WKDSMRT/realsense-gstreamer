@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # tell GStreamer where the user plugins are
-GST_PLUGIN_PATH=/usr/local/lib/gstreamer-1.0/
+GST_PLUGIN_PATH=/usr/local/lib/x86_64-linux-gnu/gstreamer-1.0/
 export GST_PLUGIN_PATH
 
 # set debug level. range is 0 (none) to 9 (most)

@@ -352,7 +352,7 @@ gst_rsdemux_handle_src_event (GstPad * pad, GstObject * parent,
 static GstFlowReturn make_new_pads(GstRSDemux* rsdemux, const RSHeader& header)
 {
   rsdemux->header = header;
-
+  GST_CAT_WARNING(rsdemux_debug, "making new pads");
   GST_CAT_DEBUG(rsdemux_debug, "making pad caps");
 
   auto color_caps = gst_caps_new_simple ("video/x-raw",
@@ -444,6 +444,7 @@ gst_rsdemux_demux_video (GstRSDemux * rsdemux, GstBuffer * buffer)
   ret = gst_pad_push (rsdemux->colorsrcpad, colorbuf);
   if (ret != GST_FLOW_OK)
     GST_ELEMENT_WARNING(rsdemux, RESOURCE, SETTINGS, ("Pushing to color src gave %d.", ret), (NULL));
+
   ret = gst_pad_push (rsdemux->depthsrcpad, depthbuf);
   if (ret != GST_FLOW_OK)
     GST_ELEMENT_WARNING(rsdemux, RESOURCE, SETTINGS, ("Pushing to depth src gave %d.", ret), (NULL));
@@ -455,6 +456,7 @@ gst_rsdemux_demux_video (GstRSDemux * rsdemux, GstBuffer * buffer)
       GST_ELEMENT_WARNING(rsdemux, RESOURCE, SETTINGS, ("Pushing to IMU src gave %d.", ret), (NULL));
   }
 
+  gst_buffer_unref(buffer);
   return ret;
 }
 
@@ -473,8 +475,9 @@ gst_rsdemux_demux_frame (GstRSDemux * rsdemux, GstBuffer * buffer)
   {
     vret = ret = gst_rsdemux_demux_video (rsdemux, buffer);
     if (G_UNLIKELY (ret != GST_FLOW_OK && ret != GST_FLOW_NOT_LINKED))
-      throw new std::runtime_error("gst_rsdemux_demux_video failed"); 
-    
+    {
+      GST_ELEMENT_ERROR(rsdemux, RESOURCE, FAILED, ("gst_rsdemux_demux_frame: %d, state=%d", ret, rsdemux->state_change), (NULL));
+    }
     
     /* if both are not linked, we stop */
     if (G_UNLIKELY (vret == GST_FLOW_NOT_LINKED)) {
@@ -512,7 +515,9 @@ gst_rsdemux_change_state (GstElement * element, GstStateChange transition)
 {
   GstRSDemux *rsdemux = GST_RSDEMUX (element);
   GstStateChangeReturn ret;
+  rsdemux->state_change = transition;
 
+  // upward transitions 
   switch (transition) {
     case GST_STATE_CHANGE_NULL_TO_READY:
       break;
@@ -527,6 +532,7 @@ gst_rsdemux_change_state (GstElement * element, GstStateChange transition)
 
   ret = GST_ELEMENT_CLASS (parent_class)->change_state (element, transition);
 
+  // downward transitions 
   switch (transition) {
     case GST_STATE_CHANGE_PLAYING_TO_PAUSED:
       break;

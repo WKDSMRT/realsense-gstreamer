@@ -100,6 +100,8 @@ static gboolean gst_realsense_src_start (GstBaseSrc * basesrc);
 static gboolean gst_realsense_src_stop (GstBaseSrc * basesrc);
 static GstCaps *gst_realsense_src_get_caps (GstBaseSrc * src, GstCaps * filter);
 static gboolean gst_realsense_src_set_caps (GstBaseSrc * src, GstCaps * caps);
+static gboolean gst_realsense_src_unlock (GstBaseSrc * basesrc);
+static gboolean gst_realsense_src_unlock_stop (GstBaseSrc * basesrc);
 
 /* initialize the realsensesrc's class */
 static void
@@ -138,6 +140,8 @@ gst_realsense_src_class_init (GstRealsenseSrcClass * klass)
   gstbasesrc_class->start = gst_realsense_src_start;
   gstbasesrc_class->stop = gst_realsense_src_stop;
   // gstbasesrc_class->decide_allocation = gst_video_test_src_decide_allocation;
+  gstbasesrc_class->unlock = GST_DEBUG_FUNCPTR (gst_realsense_src_unlock);
+  gstbasesrc_class->unlock_stop = GST_DEBUG_FUNCPTR (gst_realsense_src_unlock_stop);
 
   gstpushsrc_class->create = gst_realsense_src_create;
 
@@ -182,6 +186,8 @@ gst_realsense_src_init (GstRealsenseSrc * src)
 
   /* override default of BYTES to operate in time mode */
   gst_base_src_set_format (GST_BASE_SRC (src), GST_FORMAT_TIME);
+
+  src->stop_requested = FALSE;
 }
 
 static void
@@ -232,6 +238,30 @@ gst_realsense_src_get_property (GObject * object, guint prop_id, GValue * value,
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
       break;
   }
+}
+
+static gboolean
+gst_realsense_src_unlock (GstBaseSrc * basesrc)
+{
+  GstRealsenseSrc *src = GST_REALSENSESRC (basesrc);
+
+  GST_LOG_OBJECT (src, "unlock");
+
+  src->stop_requested = TRUE;
+
+  return TRUE;
+}
+
+static gboolean
+gst_realsense_src_unlock_stop (GstBaseSrc * basesrc)
+{
+  GstRealsenseSrc *src = GST_REALSENSESRC (basesrc);
+
+  GST_LOG_OBJECT (src, "unlock_stop");
+
+  src->stop_requested = FALSE;
+
+  return TRUE;
 }
 
 static GstBuffer *
@@ -317,13 +347,13 @@ gst_realsense_src_create (GstPushSrc * psrc, GstBuffer ** buf)
   }
 
 
-  // if (src->stop_requested) {
-  //   if (*buf != NULL) {
-  //     gst_buffer_unref (*buf);
-  //     *buf = NULL;
-  //   }
-  //   return GST_FLOW_FLUSHING;
-  // }
+  if (src->stop_requested) {
+    if (*buf != NULL) {
+      gst_buffer_unref (*buf);
+      *buf = NULL;
+    }
+    return GST_FLOW_FLUSHING;
+  }
 
   GST_CAT_DEBUG(gst_realsense_src_debug, "create method done");
 
