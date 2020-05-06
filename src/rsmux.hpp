@@ -29,6 +29,7 @@
 #include "common.hpp"
 
 #include <tuple>
+#include <cstring>
 
 using buf_tuple = std::tuple<GstBuffer*, GstBuffer*, GstBuffer*>;
 
@@ -96,7 +97,7 @@ public:
                        minfo.size, src->gst_stride, cframe.get_frame_number());
         GST_LOG_OBJECT(src, "Buffer timestamp %f", cframe.get_timestamp());
 
-        memcpy(minfo.data, &header, sizeof(header));
+        std::memcpy(minfo.data, &header, sizeof(header));
 
         // TODO refactor this section into cleaner code
         // NOTE We're always StreamMux now. If color or depth is off, then those portions will be 0
@@ -107,7 +108,7 @@ public:
         rs_stride = cframe.get_stride_in_bytes();
         if (src->gst_stride == rs_stride)
         {
-            memcpy(outdata, ((guint8 *)cframe.get_data()), color_sz);
+            std::memcpy(outdata, ((guint8 *)cframe.get_data()), color_sz);
             outdata += color_sz;
         }
         else
@@ -116,7 +117,7 @@ public:
             GST_INFO_OBJECT(src, "Image strides not identical, copy will be slower.");
             for (i = 0; i < src->height; i++)
             {
-                memcpy(outdata,
+                std::memcpy(outdata,
                        ((guint8 *)cframe.get_data()) + i * rs_stride,
                        rs_stride);
                 outdata += src->gst_stride;
@@ -125,15 +126,15 @@ public:
 
         if (depth_sz != 0)
         {
-            memcpy(outdata, depth.get_data(), depth_sz);
+            std::memcpy(outdata, depth.get_data(), depth_sz);
             outdata += depth_sz;
         }
 
         if (imu_sz != 0 && src->imu_on)
         {
-            memcpy(outdata, accel_frame.get_data(), accel_frame.get_data_size());
+            std::memcpy(outdata, accel_frame.get_data(), accel_frame.get_data_size());
             outdata += accel_frame.get_data_size();
-            memcpy(outdata, gyro_frame.get_data(), gyro_frame.get_data_size());
+            std::memcpy(outdata, gyro_frame.get_data(), gyro_frame.get_data_size());
             outdata += gyro_frame.get_data_size();
         }
         gst_buffer_unmap(buffer, &minfo);
@@ -150,13 +151,13 @@ public:
         auto colorbuf = gst_buffer_new_and_alloc(color_sz);
         gst_buffer_map(colorbuf, &cmap, GST_MAP_WRITE);
         auto cdata = inmap.data + sizeof(RSHeader);
-        memcpy(cmap.data, cdata, color_sz);
+        std::memcpy(cmap.data, cdata, color_sz);
 
         auto depth_sz = header.depth_height * header.depth_stride;
         auto depthbuf = gst_buffer_new_and_alloc(depth_sz);
         gst_buffer_map(depthbuf, &dmap, GST_MAP_WRITE);
         auto ddata = cdata + color_sz;
-        memcpy(dmap.data, ddata, depth_sz);
+        std::memcpy(dmap.data, ddata, depth_sz);
 
         GstBuffer* imubuf = nullptr;
         if (header.accel_format != GST_AUDIO_FORMAT_UNKNOWN && header.gyro_format != GST_AUDIO_FORMAT_UNKNOWN)
@@ -165,7 +166,7 @@ public:
             gst_buffer_map(imubuf, &imumap, GST_MAP_READ);
             constexpr auto imu_sz = 2*sizeof(rs2_vector);
             auto imudata = ddata + depth_sz;
-            memcpy(imumap.data, imudata, imu_sz);
+            std::memcpy(imumap.data, imudata, imu_sz);
             GST_BUFFER_TIMESTAMP(imubuf) = GST_BUFFER_TIMESTAMP(buffer);
             gst_buffer_unmap(imubuf, &imumap);
         }
