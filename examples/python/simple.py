@@ -20,7 +20,7 @@ class GTK_Main(object):
 
     def __init__(self):
         window = Gtk.Window(Gtk.WindowType.TOPLEVEL)
-        window.set_title("Mpeg2-Player")
+        window.set_title("Gst Realsense")
         window.set_default_size(500, 400)
         window.connect("destroy", Gtk.main_quit, "WM destroy")
         vbox = Gtk.VBox()
@@ -119,7 +119,7 @@ class GTK_Main(object):
             self.button.set_label("Stop")
             self.pipeline.set_state(Gst.State.PLAYING)
         elif self.button.get_label() == "Stop":
-            self.pipeline.set_state(Gst.State.NULL)
+            self.pipeline.set_state(Gst.State.PAUSED)
             self.button.set_label("Start")
 
     def on_message(self, bus, message):
