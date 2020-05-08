@@ -21,6 +21,7 @@ As with GStreamer itself, the RealSense plugin uses the [Meson](https://mesonbui
 The plugin has been developed and tested on Ubuntu 18.04.
 
 ### Dependencies
+- A compiler which supports C++17 
 - GStreamer 1.0 or higher
     - Follow the [instructions](https://gstreamer.freedesktop.org/documentation/installing/index.html?gi-language=c) for your operating system.
 - [Intel RealSense SDK](https://dev.intelrealsense.com/docs/installation)
