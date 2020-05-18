@@ -28,6 +28,7 @@
 
 #include "common.hpp"
 
+#include <iostream>
 #include <tuple>
 #include <cstring>
 
@@ -77,8 +78,8 @@ public:
         if(src->imu_on)
         {
             accel_frame = frame_set.first_or_default(RS2_STREAM_ACCEL);
-            gyro_frame = frame_set.first_or_default(RS2_STREAM_ACCEL);
-            imu_sz = accel_frame.get_data_size() + gyro_frame.get_data_size(); // s.b. 24 bytes
+            gyro_frame = frame_set.first_or_default(RS2_STREAM_GYRO);
+            imu_sz = accel_frame.get_data_size() + gyro_frame.get_data_size();
         }
         constexpr auto header_sz = sizeof(RSHeader);
 
@@ -132,6 +133,19 @@ public:
 
         if (imu_sz != 0 && src->imu_on)
         {
+#ifdef DEBUG
+            auto print_imu = [](const float *ptr, const auto descrtion) {
+                std::cout << descrtion << ": ";
+                for (size_t idx = 0; idx < 3; ++idx)
+                {
+                    std::cout << *ptr << ',';
+                    ++ptr;
+                }
+                std::cout << std::endl;
+            };
+            print_imu(static_cast<const float*>(accel_frame.get_data()), "accel");
+            print_imu(static_cast<const float*>(gyro_frame.get_data()), "gyro");
+#endif
             std::memcpy(outdata, accel_frame.get_data(), accel_frame.get_data_size());
             outdata += accel_frame.get_data_size();
             std::memcpy(outdata, gyro_frame.get_data(), gyro_frame.get_data_size());
