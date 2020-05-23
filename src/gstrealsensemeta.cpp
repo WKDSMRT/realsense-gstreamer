@@ -124,13 +124,14 @@ GstRealsenseMeta* gst_buffer_add_realsense_meta (GstBuffer * buffer,
     return meta;
 }
 
-// const char* gst_buffer_get_string_meta_cstring(GstBuffer* buffer)
-// {
-//     GstRealsenseMeta* meta = gst_buffer_get_string_meta(buffer);
-//     if (meta != nullptr) {
-//         return meta->str->c_str();
-//     }
-//     else {
-//         return nullptr;
-//     }
-// }
+
+float gst_buffer_realsense_get_depth_meta(GstBuffer* buffer)
+{
+    GstRealsenseMeta* meta = gst_buffer_get_realsense_meta(buffer);
+    if (meta != nullptr) {
+        return meta->depth_units;
+    }
+    else {
+        return 0.f;
+    }
+}

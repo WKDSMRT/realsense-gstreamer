@@ -39,7 +39,7 @@ struct _GstRealsenseMeta {
   std::string* cam_serial_number;
   std::string* json_descr; // generic json descriptor
   uint exposure = 0;
-  float depth_units 0.f;
+  float depth_units = 0.f;
 };
 
 GType gst_realsense_meta_api_get_type (void);
@@ -55,7 +55,7 @@ GstRealsenseMeta *gst_buffer_add_realsense_meta(GstBuffer* buffer,
         );
 
 // for python access
-// const char* gst_buffer_get_realsense_meta_cstring(GstBuffer* buffer);
+float gst_buffer_realsense_get_depth_meta(GstBuffer* buffer);
 
 G_END_DECLS
 

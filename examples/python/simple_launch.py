@@ -8,6 +8,8 @@ gi.require_version('Gst', '1.0')
 gi.require_version('Gtk', '3.0')
 from gi.repository import Gst, GObject, Gtk
 
+import gst_realsense_meta
+
 use_appsink = True
 
 class GTK_Main:
@@ -15,7 +17,7 @@ class GTK_Main:
         window = Gtk.Window(Gtk.WindowType.TOPLEVEL)
         window.set_title("Webcam-Viewer")
         window.set_default_size(500, 400)
-        window.connect("destroy", Gtk.main_quit, "WM destroy")
+        window.connect("destroy", self.exit) 
         vbox = Gtk.VBox()
         window.add(vbox)
         self.movie_window = Gtk.DrawingArea()
@@ -64,11 +66,12 @@ class GTK_Main:
             self.player.set_state(Gst.State.PLAYING)
             self.start_time = time.time()
         else:
-            self.player.set_state(Gst.State.NULL)
+            self.player.set_state(Gst.State.PAUSED)
             self.button.set_label("Start")
             self.start_time = 0
 
     def exit(self, widget, data=None):
+        self.player.set_state(Gst.State.NULL)
         Gtk.main_quit()
 
     def on_new_sample(self, sink):
@@ -77,7 +80,9 @@ class GTK_Main:
         t = time.time()
         if buffer:
             # do something with the video buffer, if desired
-            pass
+            units = gst_realsense_meta.get_depth_units(buffer)
+            if units:
+                print(f'got depth units from buffer: {units}')
 
         if self.prev_time is None:
             self.prev_time = t
@@ -86,6 +91,10 @@ class GTK_Main:
             inst_fr = 1.0 / (t - self.prev_time)
             self.prev_time = t
         
+        units = gst_realsense_meta.get_depth_units(buffer)
+        if units:
+            print(f'got depth units from buffer: {units}')
+
         elapsed = t - self.start_time
         self.frame_count += 1
         mean_fr = self.frame_count / elapsed
