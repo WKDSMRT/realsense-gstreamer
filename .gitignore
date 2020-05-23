@@ -33,8 +33,7 @@
 *.so
 
 # Build
-build
-mbuild
+*build/
 cmake*/
 
 # IDE/editor files
