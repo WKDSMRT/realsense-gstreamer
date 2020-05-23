@@ -51,7 +51,8 @@ static gboolean gst_realsense_meta_transform (GstBuffer * dest, GstMeta * meta,
             *source_meta->cam_model,
             *source_meta->cam_serial_number,
             source_meta->exposure,
-            *source_meta->json_descr);
+            *source_meta->json_descr,
+            source_meta->depth_units);
         if(dest_meta == nullptr)
             return false;
     }
@@ -71,7 +72,7 @@ static gboolean gst_realsense_meta_init (GstMeta * meta, gpointer params,
     emeta->cam_serial_number = nullptr;
     emeta->json_descr = nullptr;
     emeta->exposure = 0;
-
+    emeta->depth_units = 0.f;
     return TRUE;
 }
 
@@ -82,6 +83,7 @@ static void gst_realsense_meta_free (GstMeta * meta, GstBuffer * buffer)
     delete rsmeta->cam_serial_number;
     delete rsmeta->json_descr;
     rsmeta->exposure = 0;
+    rsmeta->depth_units = 0.f;
 }
 
 const GstMetaInfo * gst_realsense_meta_get_info (void)
@@ -105,17 +107,19 @@ GstRealsenseMeta* gst_buffer_add_realsense_meta (GstBuffer * buffer,
         const std::string model,
         const std::string serial_number,
         const uint exposure,
-        const std::string json_descr)
+        const std::string json_descr,
+        float depth_units)
 {
     g_return_val_if_fail (GST_IS_BUFFER (buffer), nullptr);
 
     auto meta = 
-        reinterpret_cast<GstRealsenseMeta*>(gst_buffer_add_meta(buffer, GST_REALSENSE_META_INFO, nullptr));//reinterpret_cast<gpointer>(const_cast<char*>(data)));
+        reinterpret_cast<GstRealsenseMeta*>(gst_buffer_add_meta(buffer, GST_REALSENSE_META_INFO, nullptr));
 
     meta->cam_model = new std::string(model);
     meta->cam_serial_number = new std::string(serial_number);
     meta->json_descr = new std::string(json_descr);
     meta->exposure = exposure;
+    meta->depth_units = depth_units;
 
     return meta;
 }

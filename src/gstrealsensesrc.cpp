@@ -334,9 +334,9 @@ gst_realsense_src_create (GstPushSrc * psrc, GstBuffer ** buf)
     ++(src->frame_count);
     calculate_frame_rate(src, tdiff);
     src->prev_time = tdiff;
-
+    const auto depth_units = frame_set.get_depth_frame().get_units();
     const auto exposure = static_cast<uint>(frame_set.get_frame_metadata(RS2_FRAME_METADATA_ACTUAL_EXPOSURE));
-    gst_buffer_add_realsense_meta(*buf, "unknown", std::to_string(src->serial_number), exposure, "");
+    gst_buffer_add_realsense_meta(*buf, "unknown", std::to_string(src->serial_number), exposure, "", depth_units);
   }
   catch (rs2::error & e)
   {
