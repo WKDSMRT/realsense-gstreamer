@@ -28,22 +28,22 @@
 
 G_BEGIN_DECLS
 
-#define GST_REALSENSE_META_API_TYPE (gst_realsense_meta_api_get_type())
-#define GST_REALSENSE_META_INFO  (gst_realsense_meta_get_info())
-typedef struct _GstRealsenseMeta GstRealsenseMeta;
-
 struct _GstRealsenseMeta {
   GstMeta            meta;
-
+  
+  uint exposure = 0;
+  float depth_units = 0.f;
   std::string* cam_model;
   std::string* cam_serial_number;
   std::string* json_descr; // generic json descriptor
-  uint exposure = 0;
-  float depth_units = 0.f;
 };
 
 GType gst_realsense_meta_api_get_type (void);
+#define GST_REALSENSE_META_API_TYPE (gst_realsense_meta_api_get_type())
 const GstMetaInfo *gst_realsense_meta_get_info (void);
+#define GST_REALSENSE_META_INFO  (gst_realsense_meta_get_info())
+typedef struct _GstRealsenseMeta GstRealsenseMeta;
+
 #define gst_buffer_get_realsense_meta(b) ((GstRealsenseMeta*)gst_buffer_get_meta((b),GST_REALSENSE_META_API_TYPE))
 
 GstRealsenseMeta *gst_buffer_add_realsense_meta(GstBuffer* buffer, 

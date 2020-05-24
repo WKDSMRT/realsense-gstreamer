@@ -38,30 +38,24 @@ GType gst_realsense_meta_api_get_type (void)
     return type;
 }
 
-
 static gboolean gst_realsense_meta_transform (GstBuffer * dest, GstMeta * meta,
                                            GstBuffer * buffer, GQuark type, gpointer data)
 {
     GstRealsenseMeta* source_meta = reinterpret_cast<GstRealsenseMeta*>(meta);
-    
+    GstRealsenseMeta* dest_meta = nullptr;
+
     if(GST_META_TRANSFORM_IS_COPY(type))
     {
-        GstRealsenseMeta* dest_meta = gst_buffer_add_realsense_meta(
+        dest_meta = gst_buffer_add_realsense_meta(
             dest, 
             *source_meta->cam_model,
             *source_meta->cam_serial_number,
             source_meta->exposure,
             *source_meta->json_descr,
             source_meta->depth_units);
-        if(dest_meta == nullptr)
-            return false;
-    }
-    else
-    {
-        return false;
     }
     
-    return false;
+    return dest_meta != nullptr;
 }
 
 static gboolean gst_realsense_meta_init (GstMeta * meta, gpointer params,
@@ -127,6 +121,9 @@ GstRealsenseMeta* gst_buffer_add_realsense_meta (GstBuffer * buffer,
 
 float gst_buffer_realsense_get_depth_meta(GstBuffer* buffer)
 {
+    if(buffer == nullptr)
+        return 0.f;
+        
     GstRealsenseMeta* meta = gst_buffer_get_realsense_meta(buffer);
     if (meta != nullptr) {
         return meta->depth_units;

@@ -27,24 +27,25 @@ plugin_sources = [
   'gstrealsensesrc.cpp',
   'gstrealsensedemux.cpp',
   'rsmux.hpp',
-  'gstrealsensemeta.cpp'
   ]
-
-gstpluginexample = library('gstrealsensesrc',
-  plugin_sources,
-  cpp_args: [plugin_cpp_args, '-std=c++1z'],
-  dependencies : gst_dependencies,
-  install : true,
-  install_dir : plugins_install_dir,
-  )
 
 gst_meta_sources = [
   'gstrealsensemeta.cpp'
   ]
 
-gstsmrt_meta_lib = shared_library('gstrealsense_meta', 
+gstrealsense_meta_lib = shared_library('gstrealsense_meta', 
   gst_meta_sources,
   dependencies : gst_dependencies,
   install : true,
   install_dir : libdir
   )
+
+gstpluginexample = library('gstrealsensesrc',
+  plugin_sources,
+  cpp_args: [plugin_cpp_args, '-std=c++1z'],
+  dependencies : gst_dependencies,
+  link_with : gstrealsense_meta_lib,
+  install : true,
+  install_dir : plugins_install_dir,
+  )
+
