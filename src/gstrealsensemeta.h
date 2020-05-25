@@ -24,6 +24,7 @@
 
 #include <gst/video/video.h>
 
+#include <librealsense2/rs.hpp>
 #include <string>
 
 G_BEGIN_DECLS
@@ -33,6 +34,7 @@ struct _GstRealsenseMeta {
   
   uint exposure = 0;
   float depth_units = 0.f;
+  rs2_intrinsics color_intrinsics;
   std::string* cam_model;
   std::string* cam_serial_number;
   std::string* json_descr; // generic json descriptor
@@ -51,11 +53,11 @@ GstRealsenseMeta *gst_buffer_add_realsense_meta(GstBuffer* buffer,
         const std::string serial_number,
         uint exposure, 
         const std::string json_descr,
-        float depth_units
+        float depth_units,
+        const rs2_intrinsics* color_intrinsics
         );
 
 // for python access
-struct rs2_intrinsics; // forward declaration
 float gst_buffer_realsense_get_depth_meta(GstBuffer* buffer);
 rs2_intrinsics* gst_buffer_realsense_meta_get_instrinsics(GstBuffer* buffer);
 
