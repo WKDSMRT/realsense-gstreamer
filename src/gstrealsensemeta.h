@@ -55,7 +55,9 @@ GstRealsenseMeta *gst_buffer_add_realsense_meta(GstBuffer* buffer,
         );
 
 // for python access
+struct rs2_intrinsics; // forward declaration
 float gst_buffer_realsense_get_depth_meta(GstBuffer* buffer);
+rs2_intrinsics* gst_buffer_realsense_meta_get_instrinsics(GstBuffer* buffer);
 
 G_END_DECLS
 

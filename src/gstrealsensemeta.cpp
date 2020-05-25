@@ -23,6 +23,8 @@
 
 #include <gstrealsensemeta.h>
 
+#include <librealsense2/rs.hpp>
+
 #include <iostream>
 
 GType gst_realsense_meta_api_get_type (void)
@@ -118,17 +120,34 @@ GstRealsenseMeta* gst_buffer_add_realsense_meta (GstBuffer * buffer,
     return meta;
 }
 
-
 float gst_buffer_realsense_get_depth_meta(GstBuffer* buffer)
 {
     if(buffer == nullptr)
         return 0.f;
-        
+
     GstRealsenseMeta* meta = gst_buffer_get_realsense_meta(buffer);
-    if (meta != nullptr) {
+    if (meta != nullptr) 
+    {
         return meta->depth_units;
     }
-    else {
+    else 
+    {
         return 0.f;
     }
+}
+
+rs2_intrinsics* gst_buffer_realsense_meta_get_instrinsics(GstBuffer* buffer)
+{
+    if(buffer == nullptr)
+        return nullptr;
+    
+    auto intrs = new rs2_intrinsics;    
+    GstRealsenseMeta* meta = gst_buffer_get_realsense_meta(buffer);
+    if (meta != nullptr) 
+    {
+        intrs->width = 37;
+        std::cout << "set intrisic width to " << intrs->width << std::endl;
+    }
+
+    return intrs;
 }
