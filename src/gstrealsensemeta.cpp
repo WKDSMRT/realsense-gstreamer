@@ -23,6 +23,8 @@
 
 #include <gstrealsensemeta.h>
 
+#include <librealsense2/rs.hpp>
+
 #include <iostream>
 
 GType gst_realsense_meta_api_get_type (void)
@@ -38,40 +40,37 @@ GType gst_realsense_meta_api_get_type (void)
     return type;
 }
 
-
 static gboolean gst_realsense_meta_transform (GstBuffer * dest, GstMeta * meta,
                                            GstBuffer * buffer, GQuark type, gpointer data)
 {
     GstRealsenseMeta* source_meta = reinterpret_cast<GstRealsenseMeta*>(meta);
-    
+    GstRealsenseMeta* dest_meta = nullptr;
+
     if(GST_META_TRANSFORM_IS_COPY(type))
     {
-        GstRealsenseMeta* dest_meta = gst_buffer_add_realsense_meta(
+        dest_meta = gst_buffer_add_realsense_meta(
             dest, 
             *source_meta->cam_model,
             *source_meta->cam_serial_number,
             source_meta->exposure,
-            *source_meta->json_descr);
-        if(dest_meta == nullptr)
-            return false;
-    }
-    else
-    {
-        return false;
+            *source_meta->json_descr,
+            source_meta->depth_units,
+            &(source_meta->color_intrinsics));
     }
     
-    return false;
+    return dest_meta != nullptr;
 }
 
 static gboolean gst_realsense_meta_init (GstMeta * meta, gpointer params,
                                       GstBuffer * buffer)
 {
-    GstRealsenseMeta* emeta = reinterpret_cast<GstRealsenseMeta*>(meta);
-    emeta->cam_model = nullptr;
-    emeta->cam_serial_number = nullptr;
-    emeta->json_descr = nullptr;
-    emeta->exposure = 0;
-
+    GstRealsenseMeta* rsmeta = reinterpret_cast<GstRealsenseMeta*>(meta);
+    rsmeta->cam_model = nullptr;
+    rsmeta->cam_serial_number = nullptr;
+    rsmeta->json_descr = nullptr;
+    rsmeta->exposure = 0;
+    rsmeta->depth_units = 0.f;
+    rsmeta->color_intrinsics = {};
     return TRUE;
 }
 
@@ -82,6 +81,8 @@ static void gst_realsense_meta_free (GstMeta * meta, GstBuffer * buffer)
     delete rsmeta->cam_serial_number;
     delete rsmeta->json_descr;
     rsmeta->exposure = 0;
+    rsmeta->depth_units = 0.f;
+    rsmeta->color_intrinsics = {};
 }
 
 const GstMetaInfo * gst_realsense_meta_get_info (void)
@@ -105,28 +106,50 @@ GstRealsenseMeta* gst_buffer_add_realsense_meta (GstBuffer * buffer,
         const std::string model,
         const std::string serial_number,
         const uint exposure,
-        const std::string json_descr)
+        const std::string json_descr,
+        float depth_units,
+        const rs2_intrinsics* color_intrinsics)
 {
     g_return_val_if_fail (GST_IS_BUFFER (buffer), nullptr);
 
     auto meta = 
-        reinterpret_cast<GstRealsenseMeta*>(gst_buffer_add_meta(buffer, GST_REALSENSE_META_INFO, nullptr));//reinterpret_cast<gpointer>(const_cast<char*>(data)));
+        reinterpret_cast<GstRealsenseMeta*>(gst_buffer_add_meta(buffer, GST_REALSENSE_META_INFO, nullptr));
 
     meta->cam_model = new std::string(model);
     meta->cam_serial_number = new std::string(serial_number);
     meta->json_descr = new std::string(json_descr);
     meta->exposure = exposure;
-
+    meta->depth_units = depth_units;
+    meta->color_intrinsics = *color_intrinsics;
     return meta;
 }
 
-// const char* gst_buffer_get_string_meta_cstring(GstBuffer* buffer)
-// {
-//     GstRealsenseMeta* meta = gst_buffer_get_string_meta(buffer);
-//     if (meta != nullptr) {
-//         return meta->str->c_str();
-//     }
-//     else {
-//         return nullptr;
-//     }
-// }
+float gst_buffer_realsense_get_depth_meta(GstBuffer* buffer)
+{
+    if(buffer == nullptr)
+        return 0.f;
+
+    GstRealsenseMeta* meta = gst_buffer_get_realsense_meta(buffer);
+    if (meta != nullptr) 
+    {
+        return meta->depth_units;
+    }
+    else 
+    {
+        return 0.f;
+    }
+}
+
+rs2_intrinsics* gst_buffer_realsense_meta_get_instrinsics(GstBuffer* buffer)
+{
+    if(buffer == nullptr)
+        return nullptr;
+    
+    GstRealsenseMeta* meta = gst_buffer_get_realsense_meta(buffer);
+    if (meta != nullptr) 
+    {
+        return &(meta->color_intrinsics);
+    }
+
+    return nullptr;
+}

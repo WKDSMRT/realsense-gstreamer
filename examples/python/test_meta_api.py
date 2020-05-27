@@ -10,8 +10,6 @@ from gi.repository import Gst, GObject, Gtk
 
 import gst_realsense_meta
 
-use_appsink = True
-
 class GTK_Main:
     def __init__(self):
         window = Gtk.Window(Gtk.WindowType.TOPLEVEL)
@@ -38,15 +36,9 @@ class GTK_Main:
         hbox.add(Gtk.Label())
         window.show_all()
 
-        if use_appsink:
-            color_sink = "appsink name=sink emit-signals=true"
-        else:
-            color_sink = "autovideosink"
+        color_sink = "appsink name=sink emit-signals=true"
 
-        pipeline_str = f'realsensesrc stream-type=2 align=0 imu_on=false ! \
-            rsdemux name=demux ! queue ! videoconvert ! {color_sink} \
-                demux. ! queue ! videoconvert ! autovideosink'
-
+        pipeline_str = f'realsensesrc stream-type=2 align=0 imu_on=false ! {color_sink}'
 
         # Set up the gstreamer pipeline
         self.player = Gst.parse_launch (pipeline_str)
@@ -54,11 +46,10 @@ class GTK_Main:
         bus.add_signal_watch()
         bus.enable_sync_message_emission()
         bus.connect("message", self.on_message)
-        bus.connect("sync-message::element", self.on_sync_message)
+        # bus.connect("sync-message::element", self.on_sync_message)
         
-        if use_appsink:
-            sink_element = self.player.get_by_name("sink")
-            sink_element.connect('new-sample', self.on_new_sample)
+        sink_element = self.player.get_by_name("sink")
+        sink_element.connect('new-sample', self.on_new_sample)
 
     def start_stop(self, w):
         if self.button.get_label() == "Start":
@@ -81,8 +72,10 @@ class GTK_Main:
         if buffer:
             # do something with the video buffer, if desired
             units = gst_realsense_meta.get_depth_units(buffer)
+            intrs = gst_realsense_meta.get_color_intrinsics(buffer)
             if units:
                 print(f'got depth units from buffer: {units}')
+                print(f'intrinsic width: {intrs.width}')
 
         if self.prev_time is None:
             self.prev_time = t
@@ -91,10 +84,6 @@ class GTK_Main:
             inst_fr = 1.0 / (t - self.prev_time)
             self.prev_time = t
         
-        units = gst_realsense_meta.get_depth_units(buffer)
-        if units:
-            print(f'got depth units from buffer: {units}')
-
         elapsed = t - self.start_time
         self.frame_count += 1
         mean_fr = self.frame_count / elapsed
@@ -112,17 +101,9 @@ class GTK_Main:
             print (f'Error: {err}, {debug}')
             self.player.set_state(Gst.State.NULL)
             self.button.set_label("Start")
+        else:
+            print(t)
 
-    def on_sync_message(self, bus, message):
-        struct = message.get_structure()
-        if not struct:
-            return
-        message_name = struct.get_name()
-        if message_name == "prepare-xwindow-id":
-            # Assign the viewport
-            imagesink = message.src
-            imagesink.set_property("force-aspect-ratio", True)
-            imagesink.set_xwindow_id(self.movie_window.window.xid)
 
 Gst.init(None)
 GTK_Main()

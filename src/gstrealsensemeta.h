@@ -24,36 +24,42 @@
 
 #include <gst/video/video.h>
 
+#include <librealsense2/rs.hpp>
 #include <string>
 
 G_BEGIN_DECLS
 
-#define GST_REALSENSE_META_API_TYPE (gst_realsense_meta_api_get_type())
-#define GST_REALSENSE_META_INFO  (gst_realsense_meta_get_info())
-typedef struct _GstRealsenseMeta GstRealsenseMeta;
-
 struct _GstRealsenseMeta {
   GstMeta            meta;
-
+  
+  uint exposure = 0;
+  float depth_units = 0.f;
+  rs2_intrinsics color_intrinsics;
   std::string* cam_model;
   std::string* cam_serial_number;
   std::string* json_descr; // generic json descriptor
-  uint exposure = 0;
 };
 
 GType gst_realsense_meta_api_get_type (void);
+#define GST_REALSENSE_META_API_TYPE (gst_realsense_meta_api_get_type())
 const GstMetaInfo *gst_realsense_meta_get_info (void);
+#define GST_REALSENSE_META_INFO  (gst_realsense_meta_get_info())
+typedef struct _GstRealsenseMeta GstRealsenseMeta;
+
 #define gst_buffer_get_realsense_meta(b) ((GstRealsenseMeta*)gst_buffer_get_meta((b),GST_REALSENSE_META_API_TYPE))
 
 GstRealsenseMeta *gst_buffer_add_realsense_meta(GstBuffer* buffer, 
         const std::string model,
         const std::string serial_number,
         uint exposure, 
-        const std::string json_descr
+        const std::string json_descr,
+        float depth_units,
+        const rs2_intrinsics* color_intrinsics
         );
 
 // for python access
-// const char* gst_buffer_get_realsense_meta_cstring(GstBuffer* buffer);
+float gst_buffer_realsense_get_depth_meta(GstBuffer* buffer);
+rs2_intrinsics* gst_buffer_realsense_meta_get_instrinsics(GstBuffer* buffer);
 
 G_END_DECLS
 

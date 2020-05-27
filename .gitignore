@@ -31,10 +31,10 @@
 *.out
 *.app
 *.so
+*.pyc
 
 # Build
-build
-mbuild
+*build/
 cmake*/
 
 # IDE/editor files
