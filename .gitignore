@@ -35,6 +35,7 @@
 
 # Build
 *build/
+builddir/
 cmake*/
 
 # IDE/editor files

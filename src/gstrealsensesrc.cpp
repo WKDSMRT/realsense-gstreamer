@@ -406,7 +406,7 @@ static GstAudioFormat RS_to_Gst_Audio_Format(rs2_format fmt)
 }
 
 /* Adapted from librealsense/example/motion/rs-motion.cpp */
-bool check_imu_is_supported(const rs2::device& dev)
+bool check_imu_is_supported(const std::string& sn) //const rs2::device& dev)
 {
     bool found_gyro = false;
     bool found_accel = false;
@@ -415,18 +415,23 @@ bool check_imu_is_supported(const rs2::device& dev)
     // The same device should support gyro and accel
     found_gyro = false;
     found_accel = false;
-    for (auto sensor : dev.query_sensors())
+    for (auto dev : ctx.query_devices())
     {
-        for (auto profile : sensor.get_stream_profiles())
+      if (0 == sn.compare(dev.get_info(RS2_CAMERA_INFO_SERIAL_NUMBER)))
+      {
+        for (auto sensor : dev.query_sensors())
         {
-            if (profile.stream_type() == RS2_STREAM_GYRO)
-                found_gyro = true;
+            for (auto profile : sensor.get_stream_profiles())
+            {
+                if (profile.stream_type() == RS2_STREAM_GYRO)
+                    found_gyro = true;
 
-            if (profile.stream_type() == RS2_STREAM_ACCEL)
-                found_accel = true;
+                if (profile.stream_type() == RS2_STREAM_ACCEL)
+                    found_accel = true;
+            }
         }
-    }
-        
+      }
+    }   
     return found_gyro && found_accel;
 }
 
@@ -484,9 +489,14 @@ gst_realsense_src_start (GstBaseSrc * basesrc)
       }
 
       cfg.enable_device(serial_number);
+  
+      src->has_imu = check_imu_is_supported(serial_number);
+      if(src->has_imu)
+      {
+        cfg.enable_stream(RS2_STREAM_ACCEL, RS2_FORMAT_MOTION_XYZ32F);      
+        cfg.enable_stream(RS2_STREAM_GYRO, RS2_FORMAT_MOTION_XYZ32F);
+      }
 
-      cfg.enable_stream(RS2_STREAM_ACCEL, RS2_FORMAT_MOTION_XYZ32F);      
-      cfg.enable_stream(RS2_STREAM_GYRO, RS2_FORMAT_MOTION_XYZ32F);
       cfg.enable_stream(RS2_STREAM_COLOR, RS2_FORMAT_RGB8);
       cfg.enable_stream(RS2_STREAM_DEPTH, RS2_FORMAT_Z16);
       // auto profile = src->rs_pipeline->get_active_profile();
@@ -508,7 +518,7 @@ gst_realsense_src_start (GstBaseSrc * basesrc)
       }
 
       src->rs_pipeline->start(cfg);
-      src->has_imu = check_imu_is_supported(src->rs_pipeline->get_active_profile().get_device());
+      
 
       GST_LOG_OBJECT(src, "RealSense pipeline started");
 
