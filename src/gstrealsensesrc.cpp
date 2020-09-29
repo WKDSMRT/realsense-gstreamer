@@ -335,7 +335,7 @@ gst_realsense_src_create (GstPushSrc * psrc, GstBuffer ** buf)
     calculate_frame_rate(src, tdiff);
     src->prev_time = tdiff;
     const auto depth_units = frame_set.get_depth_frame().get_units();
-    const auto exposure = static_cast<uint>(frame_set.get_frame_metadata(RS2_FRAME_METADATA_ACTUAL_EXPOSURE));
+    const auto exposure = static_cast<uint>(0);//TODO fix failing get exposure frame_set.get_frame_metadata(RS2_FRAME_METADATA_ACTUAL_EXPOSURE));
 
     auto cstream = src->rs_pipeline->get_active_profile().get_stream(RS2_STREAM_COLOR).as<rs2::video_stream_profile>();
     auto cintrinsics = cstream.get_intrinsics();
