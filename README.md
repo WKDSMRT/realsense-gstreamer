@@ -33,6 +33,11 @@ The plugin has been developed and tested on Ubuntu 18.04.
 git clone https://github.com/WKDSMRT/realsense-gstreamer.git
 cd realsense-gstreamer
 ```
+
+1. Additional dependencies
+```
+libgstreamer-plugins-base1.0-dev
+```
 2. Setup up build directory, build and install
 ```
 meson . build
