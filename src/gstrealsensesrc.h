@@ -50,7 +50,7 @@ typedef struct _GstRealsenseSrcClass GstRealsenseSrcClass;
 
 using rs_pipe_ptr = std::unique_ptr<rs2::pipeline>;
 using rs_aligner_ptr = std::unique_ptr<rs2::align>;
-constexpr const auto DEFAULT_PROP_CAM_SN = 0;
+constexpr const auto DEFAULT_PROP_CAM_SN = "";
 
 struct _GstRealsenseSrc
 {
@@ -78,7 +78,7 @@ struct _GstRealsenseSrc
   
   // Properties
   Align align = Align::None;
-  guint64 serial_number = 0;
+  std::string serial_number;
   StreamType stream_type = StreamType::StreamDepth;
   bool imu_on = true;
 };

@@ -54,7 +54,7 @@ Several properties are implemented to control the function of the source plugin.
 
 
 #### cam-serial-number
-Specifies serial number of the camera to open. If no serial number is specified the plugin will open the first found RealSense device.
+Specifies serial number of the camera to open. If no serial number is specified the plugin will open the first found RealSense device. To discover serial numbers rs-enumerate-devices can be utilized (for details see https://github.com/IntelRealSense/librealsense/blob/master/tools/enumerate-devices/readme.md)
 
 #### align 
 Controls the alignement between the color and depth frames.

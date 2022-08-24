@@ -165,10 +165,10 @@ gst_realsense_src_class_init (GstRealsenseSrcClass * klass)
         (GParamFlags)(G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS)));
 
   g_object_class_install_property (gobject_class, PROP_CAM_SN,
-    g_param_spec_uint64 ("cam-serial-number", "cam-sn",
-          "Camera serial number (as unsigned int)", 
-          0, G_MAXUINT64, 0,
-          (GParamFlags) (G_PARAM_READWRITE | GST_PARAM_CONTROLLABLE | G_PARAM_STATIC_STRINGS)
+    g_param_spec_string ("cam-serial-number", "cam-sn",
+          "Camera serial number", 
+          "",
+          (GParamFlags) (G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS)
         )
     );
 }
@@ -198,8 +198,8 @@ gst_realsense_src_set_property (GObject * object, guint prop_id, const GValue * 
   switch (prop_id) 
   {
     case PROP_CAM_SN:
-      src->serial_number = g_value_get_uint64(value);
-      GST_ELEMENT_WARNING (src, RESOURCE, SETTINGS, ("Received serial number %lu.", src->serial_number), (NULL));
+      src->serial_number =  g_value_get_string(value);
+      GST_ELEMENT_WARNING (src, RESOURCE, SETTINGS, ("Received serial number %s.", src->serial_number.c_str()), (NULL));
       break;
     case PROP_ALIGN:
       src->align = static_cast<Align>(g_value_get_int(value));
@@ -223,7 +223,7 @@ gst_realsense_src_get_property (GObject * object, guint prop_id, GValue * value,
   
   switch (prop_id) {
     case PROP_CAM_SN:
-      g_value_set_uint64(value, src->serial_number);
+      g_value_set_string(value, src->serial_number.c_str());
       break;
     case PROP_ALIGN:
       g_value_set_int(value, src->align);
@@ -335,11 +335,14 @@ gst_realsense_src_create (GstPushSrc * psrc, GstBuffer ** buf)
     calculate_frame_rate(src, tdiff);
     src->prev_time = tdiff;
     const auto depth_units = frame_set.get_depth_frame().get_units();
-    const auto exposure = static_cast<uint>(frame_set.get_frame_metadata(RS2_FRAME_METADATA_ACTUAL_EXPOSURE));
+    int exposure = 0; 
+    if (frame_set.supports_frame_metadata(RS2_FRAME_METADATA_ACTUAL_EXPOSURE))
+	    exposure = static_cast<uint>(frame_set.get_frame_metadata(RS2_FRAME_METADATA_ACTUAL_EXPOSURE));
+
 
     auto cstream = src->rs_pipeline->get_active_profile().get_stream(RS2_STREAM_COLOR).as<rs2::video_stream_profile>();
     auto cintrinsics = cstream.get_intrinsics();
-    gst_buffer_add_realsense_meta(*buf, "unknown", std::to_string(src->serial_number), exposure, "", depth_units, &cintrinsics);
+    gst_buffer_add_realsense_meta(*buf, "unknown", src->serial_number.c_str(), exposure, "", depth_units, &cintrinsics);
   }
   catch (rs2::error & e)
   {
@@ -449,7 +452,8 @@ gst_realsense_src_start (GstBaseSrc * basesrc)
       
       rs2::context ctx;
       const auto dev_list = ctx.query_devices();      
-      auto serial_number = std::to_string(src->serial_number);
+      auto serial_number = src->serial_number;
+      unsigned short dev_idx = 0;
 
       if(dev_list.size() == 0)
       {
@@ -461,32 +465,34 @@ gst_realsense_src_start (GstBaseSrc * basesrc)
 
       if(src->serial_number == DEFAULT_PROP_CAM_SN)
       {
-        serial_number = std::string(dev_list[0].get_info(RS2_CAMERA_INFO_SERIAL_NUMBER));
+        serial_number = std::string(dev_list[dev_idx].get_info(RS2_CAMERA_INFO_SERIAL_NUMBER));
       }
       else
       {
-        auto val = dev_list.begin();
-        for (; val != dev_list.end(); ++val)
-        {
-          if (0 == serial_number.compare(val.operator*().get_info(RS2_CAMERA_INFO_SERIAL_NUMBER)))
+	for (; dev_idx < dev_list.size(); dev_idx++) { 
+          if (0 == serial_number.compare(dev_list[dev_idx].get_info(RS2_CAMERA_INFO_SERIAL_NUMBER)))
           {
             break;
           }
         }
         
-        if (val == dev_list.end())
+        if (dev_idx == dev_list.size())
         {
+	  dev_idx = 0;
           GST_ELEMENT_WARNING(src, RESOURCE, FAILED,
-                              ("Specified serial number %lu not found. Using first found device.", src->serial_number),
+                              ("Specified serial number %s not found. Using first found device.", src->serial_number.c_str()),
                               (NULL));
-          serial_number = dev_list[0].get_info(RS2_CAMERA_INFO_SERIAL_NUMBER);
+          serial_number = dev_list[dev_idx].get_info(RS2_CAMERA_INFO_SERIAL_NUMBER);
         }
       }
 
       cfg.enable_device(serial_number);
 
-      cfg.enable_stream(RS2_STREAM_ACCEL, RS2_FORMAT_MOTION_XYZ32F);      
-      cfg.enable_stream(RS2_STREAM_GYRO, RS2_FORMAT_MOTION_XYZ32F);
+      src->has_imu = check_imu_is_supported(dev_list[dev_idx]);
+      if(src->has_imu && src->imu_on) {
+      	cfg.enable_stream(RS2_STREAM_ACCEL, RS2_FORMAT_MOTION_XYZ32F);      
+      	cfg.enable_stream(RS2_STREAM_GYRO, RS2_FORMAT_MOTION_XYZ32F);
+      }
       cfg.enable_stream(RS2_STREAM_COLOR, RS2_FORMAT_RGB8);
       cfg.enable_stream(RS2_STREAM_DEPTH, RS2_FORMAT_Z16);
       // auto profile = src->rs_pipeline->get_active_profile();
@@ -508,7 +514,6 @@ gst_realsense_src_start (GstBaseSrc * basesrc)
       }
 
       src->rs_pipeline->start(cfg);
-      src->has_imu = check_imu_is_supported(src->rs_pipeline->get_active_profile().get_device());
 
       GST_LOG_OBJECT(src, "RealSense pipeline started");
 
